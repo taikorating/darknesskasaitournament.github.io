@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>第2回Darknessカサイカップ</title>
+    <!-- 紙吹雪ライブラリ -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- 画像化ライブラリ -->
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    <style>
+        :root { 
+            --bg-color: #161625; /* PWT風ダークネイビー */
+            --panel-bg: #ffffff; 
+            --accent: #e73c5a; 
+            --text-main: #212529; 
+        }
+        body { 
+            background-color: var(--bg-color); 
+            /* レトロな格子状背景 */
+            background-image: 
+                linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
+            background-size: 30px 30px;
+            color: #fff; 
+            font-family: 'Helvetica Neue', Arial, Meiryo, sans-serif; 
+            margin: 0; padding: 20px; 
+        }
+        h1 { text-align: center; color: #ffd700; font-size: 2.2em; margin-bottom: 20px; text-shadow: 2px 2px 0px #000, 0 0 10px #ff9800; }
+        .controls { text-align: center; margin-bottom: 20px; background: rgba(0,0,0,0.5); padding: 15px; border-radius: 8px; border: 2px solid #555; display: flex; justify-content: center; align-items: center; gap: 15px; flex-wrap: wrap; }
+        button { background-color: #ffffff; color: var(--accent); border: 2px solid var(--accent); padding: 8px 16px; font-size: 14px; cursor: pointer; border-radius: 5px; font-weight: bold; transition: 0.2s; }
+        button:hover { background-color: var(--accent); color: #fff; }
+
+        /* PWT風トーナメント表エリア */
+        .bracket-wrapper { width: 100%; overflow-x: auto; padding: 20px 0; }
+        .bracket-container { position: relative; margin: 0 auto; width: 1200px; height: 600px; background: transparent; }
+        #bracket-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+        
+        /* 選手枠（Player Box） */
+        .player-node {
+            position: absolute; width: 140px; height: 44px; background: #e0e0e0;
+            border: 3px solid #333; border-radius: 4px; display: flex; align-items: center;
+            color: #000; font-weight: 900; box-shadow: 3px 3px 0px rgba(0,0,0,0.8); z-index: 10;
+            transition: 0.3s;
+        }
+        .player-node .color-bar { width: 12px; height: 100%; border-right: 2px solid #333; }
+        .player-node .name { padding-left: 8px; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 115px; }
+        .player-node.loser { filter: brightness(0.4) grayscale(1); } /* 敗退者は暗くなる */
+
+        /* VS結節点（対戦ボタン） */
+        .vs-btn {
+            position: absolute; width: 36px; height: 36px; background: #fff; color: #000;
+            border: 3px solid #333; border-radius: 50%; font-weight: 900; font-size: 13px;
+            display: flex; justify-content: center; align-items: center; cursor: pointer;
+            transform: translate(-50%, -50%); z-index: 20; box-shadow: 2px 2px 0px rgba(0,0,0,0.8);
+            transition: 0.2s;
+        }
+        .vs-btn:hover { background: #ffd700; transform: translate(-50%, -50%) scale(1.1); }
+        .vs-btn.completed { background: #555; color: #aaa; border-color: #222; box-shadow: none; }
+        .vs-btn.completed:hover { background: #777; }
+
+        /* 三位決定戦ボックス */
+        .third-place-box {
+            position: absolute; left: 600px; top: 520px; transform: translateX(-50%); width: 260px;
+            background: rgba(0,0,0,0.8); border: 2px solid #ff9800; border-radius: 6px; padding: 10px;
+            color: #fff; cursor: pointer; box-shadow: 0 0 15px rgba(255,152,0,0.5); z-index: 10; text-align: center;
+            transition: 0.2s;
+        }
+        .third-place-box:hover { background: rgba(50,50,0,0.9); transform: translateX(-50%) scale(1.05); }
+        .third-place-box .winner { color: #ff9800; font-weight: bold; }
+
+        /* モーダル系CSS */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; justify-content: center; align-items: center; color: var(--text-main); }
+        .modal-content { background: var(--panel-bg); border-top: 6px solid var(--accent); border-radius: 8px; padding: 20px; width: 90%; max-width: 650px; max-height: 95vh; overflow-y: auto; text-align: center; position: relative; transition: background 0.5s; }
+        .vs-screen { display: flex; justify-content: space-between; align-items: center; font-size: 18px; font-weight: bold; margin-bottom: 15px; }
+        .player-box { flex: 1; padding: 10px; background: #f1f3f5; border-radius: 6px; border: 1px solid var(--border-color); }
+        
+        #finals-admin-btn { position: absolute; top: 10px; left: 10px; background: none; border: none; font-size: 20px; opacity: 0.3; cursor: pointer; display: none; }
+        #finals-admin-btn:hover { opacity: 1; }
+        #finals-admin-panel { display: none; background: #333; color: #fff; padding: 15px; border-radius: 6px; text-align: left; margin-bottom: 15px; font-size: 12px; }
+        #finals-admin-panel input { width: 100%; padding: 5px; margin: 5px 0 10px 0; border-radius: 4px; border: 1px solid #555; background: #222; color: #fff; }
+        
+        /* 🎰 パチンコ・激アツ演出CSS 🎰 */
+        #pachinko-area { display: none; margin-top: 15px; }
+        .flash-text { color: red; font-size: 28px; font-weight: 900; text-shadow: 0 0 10px yellow, 2px 2px 0 #000; margin-bottom: 10px; }
+        .pachinko-wrapper { background: linear-gradient(135deg, #111, #444, #111); border: 6px solid gold; border-radius: 10px; padding: 20px; box-shadow: 0 0 30px rgba(255, 215, 0, 0.6), inset 0 0 20px #000; }
+        .reel { background: #fff; color: #000; font-size: 18px; font-weight: 900; margin: 10px 0; padding: 15px; border: 4px solid silver; border-radius: 5px; box-shadow: inset 0 0 15px rgba(0,0,0,0.8); position: relative; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .reel.stopped { background: linear-gradient(90deg, #ffea00, #ff5e00, #ffea00); background-size: 200% 200%; animation: goldShine 0.5s infinite linear; border-color: red; color: #fff; text-shadow: 2px 2px 0 #ff0000, -2px -2px 0 #ff0000; transform: scale(1.05); transition: 0.2s; }
+        .reel.mystery { background: #111; color: #ff0000; border-color: #444; animation: mysteryPulse 0.5s infinite alternate; text-shadow: 0 0 10px #ff0000; letter-spacing: 5px; }
+        .reel.revealed { background: linear-gradient(90deg, #ff00ff, #00ffff, #ff00ff); background-size: 200% 200%; border-color: #fff; color: #fff; text-shadow: 2px 2px 0 #000; animation: revealShine 0.5s infinite linear, pop 0.5s ease-out; }
+        
+        @keyframes goldShine { 0% { background-position: 0% 50%; } 100% { background-position: 200% 50%; } }
+        @keyframes revealShine { 0% { background-position: 0% 50%; } 100% { background-position: 200% 50%; } }
+        @keyframes mysteryPulse { from { box-shadow: inset 0 0 10px #ff0000; transform: scale(1); } to { box-shadow: inset 0 0 30px #ff0000; transform: scale(1.02); } }
+        @keyframes pop { 0% { transform: scale(0.5); } 50% { transform: scale(1.2); } 100% { transform: scale(1.05); } }
+        @keyframes modalShake { 0%, 100% { transform: translate(0, 0); } 20% { transform: translate(5px, 5px); } 40% { transform: translate(-5px, -5px); } 60% { transform: translate(5px, -5px); } 80% { transform: translate(-5px, 5px); } }
+
+        .gekiatsu { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0); font-size: 100px; color: transparent; background: linear-gradient(to bottom, #fff 0%, #ffea00 40%, #ff0000 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-stroke: 3px #fff; text-shadow: 0 0 30px #ff0000; font-weight: 900; z-index: 9999; pointer-events: none; opacity: 0; white-space: nowrap; }
+        @keyframes gekiatsuAnim { 0% { opacity: 0; transform: translate(-50%, -50%) scale(0) rotate(-15deg); } 20% { opacity: 1; transform: translate(-50%, -50%) scale(1.2) rotate(5deg); } 30% { transform: translate(-50%, -50%) scale(0.9) rotate(0deg); } 80% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); } 100% { opacity: 0; transform: translate(-50%, -50%) scale(2); } }
+
+        .draw-btn-huge { width: 100%; padding: 25px; font-size: 24px; font-weight: 900; background: linear-gradient(to bottom, #ff0000, #990000); color: yellow; border: 4px solid gold; border-radius: 10px; box-shadow: 0 10px 0 #550000, 0 15px 20px rgba(0,0,0,0.5); text-shadow: 2px 2px 0 #000; cursor: pointer; transition: 0.1s; }
+        .draw-btn-huge:active { transform: translateY(10px); box-shadow: 0 0px 0 #550000, 0 5px 10px rgba(0,0,0,0.5); }
+
+        .song-section { background: #fff9db; border: 2px solid #ffe066; border-radius: 6px; padding: 15px; margin-bottom: 15px; text-align: left; }
+        .song-title { margin: 0 0 12px 0; font-size: 16px; color: var(--accent); font-weight: bold; background: #fff; padding: 10px; border-radius: 6px; border-left: 5px solid var(--accent); box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+        .song-title-text { display: flex; align-items: center; }
+        .song-title-text span { color: #212529; font-size: 18px; margin-left: 10px; }
+        .card-actions { display: flex; gap: 5px; flex-wrap: wrap; }
+        .card-btn { background: #fff; border: 1px solid var(--accent); color: var(--accent); font-size: 11px; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .card-btn:hover { background: var(--accent); color: #fff; }
+        .no-card { font-size: 11px; color: #aaa; border: 1px dashed #ccc; padding: 4px 8px; border-radius: 4px; background: #f8f9fa; }
+        .score-row { display: flex; justify-content: space-around; }
+        .score-col { text-align: center; width: 45%; background: #fff; padding: 10px; border-radius: 6px; border: 1px solid #ffe066; }
+        .score-col span { font-size: 14px; font-weight: bold; display: block; margin-bottom: 8px; color: #333; border-bottom: 1px dashed #ccc; padding-bottom: 5px; }
+        .score-col input { width: 50px; padding: 6px; font-size: 16px; text-align: center; border: 2px solid #ccc; border-radius: 4px; margin: 0 2px; color: #000;}
+
+        /* ⚔️ 再抽選（カットイン）アニメーション専用CSS ⚔️ */
+        #redraw-overlay { display: none; flex-direction: column; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 2000; justify-content: center; align-items: center; }
+        .cutin-bar { width: 100%; background: linear-gradient(90deg, transparent, #ff0000, #990000, #ff0000, transparent); padding: 30px 0; text-align: center; transform: skewY(-5deg) scaleX(0); opacity: 0; box-shadow: 0 0 50px red, inset 0 0 20px #000; }
+        .cutin-text { font-size: 50px; font-weight: 900; font-style: italic; color: #fff; text-shadow: 4px 4px 0px #000, 0 0 20px yellow; letter-spacing: 5px; white-space: nowrap; }
+        @keyframes cutinAnim { 0% { transform: skewY(-5deg) scaleX(0); opacity: 0; } 15% { transform: skewY(-5deg) scaleX(1); opacity: 1; } 85% { transform: skewY(-5deg) scaleX(1); opacity: 1; } 100% { transform: skewY(-5deg) scaleX(0); opacity: 0; } }
+        @keyframes shatterAnim { 0% { opacity: 1; transform: scale(1); filter: blur(0); } 20% { transform: scale(1.1) translateX(-10px); color: red; } 100% { opacity: 0; transform: scale(1.5) translateY(50px) rotate(10deg); filter: blur(10px); letter-spacing: 20px; } }
+
+        /* 🏆 勝者発表・リプレイ機能CSS 🏆 */
+        #winner-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 3000; justify-content: center; align-items: center; flex-direction: column; cursor: pointer; }
+        .winner-announce-text { font-size: 50px; font-weight: 900; color: #fff; text-shadow: 0 0 30px #ffea00, 5px 5px 0px #ff0000; transform: scale(0); text-align: center; line-height: 1.2; }
+        .winner-announce-text span { font-size: 80px; color: #ffd700; display: inline-block; padding: 10px; }
+        @keyframes winnerZoom { 0% { transform: scale(0) rotate(-10deg); opacity: 0; } 100% { transform: scale(1) rotate(0deg); opacity: 1; } }
+        .click-to-close { color: #aaa; margin-top: 30px; font-size: 16px; }
+        
+        .replay-btn-group { display: flex; gap: 10px; justify-content: center; margin-bottom: 20px; flex-wrap: wrap; }
+        .btn-replay { background: #222; color: #fff; border: 2px solid #555; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px; transition: 0.2s; }
+        .btn-replay:hover { background: #ffea00; color: #000; border-color: #ff9800; }
+        .btn-replay-redraw { border-color: #e73c5a; color: #ffdddd; }
+        .btn-replay-redraw:hover { background: #e73c5a; color: #fff; border-color: #fff; }
+
+        .results-section { margin-top: 20px; background: rgba(0,0,0,0.7); padding: 15px; border-radius: 8px; border: 1px solid #555;}
+        .results-table { width: 100%; border-collapse: collapse; font-size: 13px; background: #fff; color: #000;}
+        .results-table th, .results-table td { border: 1px solid var(--border-color); padding: 8px; text-align: center; }
+        .results-table th { background-color: #f1f3f5; }
+        .table-winner { color: var(--accent); font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <h1>🏆 第2回Darknessカサイカップ 🏆</h1>
+
+    <div class="controls">
+        <button onclick="shuffleAndStart()" style="background-color: var(--accent); color: white;">ランダム配置して開始</button>
+        <span style="color: #aaa;">|</span>
+        <button id="third-place-toggle-btn" onclick="toggleThirdPlace()" style="border-color: #ff9800; color: #ff9800; background: #111;">三位決定戦: OFF</button>
+        <span style="color: #aaa;">|</span>
+        <button onclick="exportToTxt()">状況をtxt保存</button>
+        <div style="color: #fff;">
+            <label for="import-file" style="font-size:13px; font-weight:bold;">txtから復元:</label>
+            <input type="file" id="import-file" accept=".txt" onchange="importFromTxt(this)" style="color:#fff;">
+        </div>
+        <span style="color: #aaa;">|</span>
+        <!-- 画像保存ボタン -->
+        <button onclick="downloadBracketImage()" style="background-color: #2196F3; color: white; border-color: #2196F3;">📸 トーナメント表を画像保存</button>
+    </div>
+
+    <!-- PWT風 対戦ツリーエリア -->
+    <div class="bracket-wrapper" id="capture-area">
+        <div class="bracket-container" id="bracket-container">
+            <svg id="bracket-svg"></svg>
+            <!-- ここにJSで選手枠(player-node)とVSボタンが追加されます -->
+        </div>
+    </div>
+
+    <div class="results-section">
+        <h2 style="color: #ffea00; border-left: 5px solid #ffea00; padding-left: 10px; font-size: 18px; margin-top: 0;">📊 試合結果一覧</h2>
+        <table class="results-table">
+            <thead><tr><th>ID</th><th>対戦カード (合計可・不可 / 失点)</th><th>課題曲</th><th>勝者</th></tr></thead>
+            <tbody id="results-table-body"><tr><td colspan="4" style="color: var(--text-muted);">まだ完了した試合はありません</td></tr></tbody>
+        </table>
+    </div>
+
+    <!-- 対戦・スコア入力モーダル -->
+    <div class="modal-overlay" id="match-modal">
+        <div class="modal-content" id="modal-content-box">
+            <span style="position: absolute; top:10px; right:15px; font-size:24px; cursor:pointer; z-index:999; color:#888;" onclick="closeModal()">&times;</span>
+            <button id="finals-admin-btn" onclick="toggleAdminPanel()">⚙️</button>
+            <h2 id="modal-match-title" style="margin-top:0;">Match</h2>
+            
+            <div id="finals-admin-panel">
+                <strong>【決勝戦/三位決定戦 サプライズ管理】</strong><br>
+                ※空欄なら通常のランダム抽選。複数曲をカンマ( , )や読点( 、 )で区切るとその中からランダム。<br>
+                曲1: <input type="text" id="admin-song-0" placeholder="例: X-DAY2000, 幽玄ノ乱"><br>
+                曲2: <input type="text" id="admin-song-1"><br>
+                曲3: <input type="text" id="admin-song-2"><br>
+                <div style="text-align:right;"><button onclick="toggleAdminPanel()" style="padding:4px 10px; color:#000;">閉じる</button></div>
+            </div>
+
+            <div class="vs-screen">
+                <div class="player-box" id="modal-p1-name" style="color:#000;">P1</div>
+                <div style="color: var(--accent); font-style: italic; padding: 0 10px;">VS</div>
+                <div class="player-box" id="modal-p2-name" style="color:#000;">P2</div>
+            </div>
+
+            <button onclick="startPachinko()" id="draw-btn" class="draw-btn-huge">🔥 課題曲抽選 PUSH!! 🔥</button>
+            
+            <div id="pachinko-area">
+                <div class="flash-text" id="pachinko-title"></div>
+                <div class="pachinko-wrapper">
+                    <div class="reel" id="reel-0">???</div>
+                    <div class="reel" id="reel-1">???</div>
+                    <div class="reel" id="reel-2">???</div>
+                </div>
+            </div>
+
+            <div id="gekiatsu-text" class="gekiatsu"></div>
+            <div id="songs-input-container" style="margin-top: 15px;"></div>
+            <button onclick="confirmResult()" style="display:none; margin-top: 20px; font-size: 16px; background-color: var(--accent); color: white; width:100%; padding:15px;" id="confirm-btn">確定して結果発表へ</button>
+        </div>
+    </div>
+
+    <!-- ⚔️ 再抽選アニメーション用オーバーレイ ⚔️ -->
+    <div id="redraw-overlay">
+        <div id="cutin-bar" class="cutin-bar">
+            <span id="cutin-text" class="cutin-text">をわん選手 カード発動!!</span>
+        </div>
+        <div id="redraw-target" style="font-size:35px; font-weight:bold; color:#aaa; margin-top:50px; text-shadow:2px 2px 5px #000;">旧曲名</div>
+        <div id="redraw-arrow" style="font-size:50px; color:yellow; margin:15px 0; display:none; text-shadow:0 0 10px red;">⬇</div>
+        <div id="redraw-reel" class="reel" style="display:none; font-size:35px; padding:25px; width:90%; max-width:800px; margin:0 auto; text-align:center;">???</div>
+        <div id="redraw-gekiatsu" class="gekiatsu" style="display:none;"></div>
+    </div>
+
+    <!-- 🏆 勝者発表オーバーレイ 🏆 -->
+    <div id="winner-overlay" onclick="closeWinnerAnimation()">
+        <div id="winner-name-text" class="winner-announce-text">勝者<br><span>〇〇選手</span> ！！</div>
+        <div class="click-to-close">画面をクリックして次へ進む</div>
+    </div>
+
+<script>
+const playersList = [ "をわん選手", "あるすて選手", "しょーき選手", "ゆのん選手", "ぺた選手", "どらごん選手", "りょうすけ選手", "ティーマ選手", "ゆうや選手", "こころ選手", "あいき選手", "たっつー選手", "ふぁみ選手", "ゆうしん選手", "あめりなう選手" ];
+const songsList = [ "重金属(火災枠)", "そして勇者は眠りにつく裏(今井枠)", "プレリュード裏(西原枠)", "ミュージックリボルバー裏(池島枠)", "ポセイドン(上平枠)", "オリオンをなぞる(きたあいき枠)", "Rough: CHA0Z(おにし枠)", "極圏(ますい枠)", "VIVIVID(西田枠)", "エクストリームエンド裏(志水枠)", "アイドルライフスターターパック裏(田中りょうま枠)", "ダンバダンバディンダン(吉田ゆづき枠)", "アンリミテッドゲームズ裏(吉田ひかる枠)", "カナデア(福崎枠)", "EDY(アルティン枠)", "Emma裏(あみのモモカ枠)", "さくらんぼ(杉山かずき枠)", "デッドオアダイ(はんだりゅうたろう枠)", "てんびん座急行夜を行く(せやな枠)", "閃光天舞(こころさん枠)", "ゆらめ(ひびきんさん枠)", "ラブイクサ裏(かんじ枠)", "ゴールドフィッシュシティ(まっち枠)", "マツケンサンバ(けんさん枠)", "スーハー2000(をワン枠)", "束ね糸(夜風枠)", "サクラシークレット(かわのなつき枠)", "ゼルダの伝説 ブレス オブ ザ ワイルド メドレー(ぜる枠)", "電子ドラムの達人(なぴ枠)", "人のお金で焼肉を食したい裏(相川枠)", "ヤマタイナイトパーティー(やまちゃん枠)", "青と夏(あおぜみや枠)", "平等院鳳凰ドンvs鳥獣戯カ裏(ティーマ枠)", "パープルローズフュージョン(ふぁみ枠)", "黒神クロニクル(しろいぞ！枠)", "ハードコアの心得(とびさん枠)", "螺旋周回軌道表(たるさん枠)" ];
+
+const defaultCards = {
+    "あるすて選手": 0, "ゆうや選手": 0, "ぺた選手": 0, "ゆうしん選手": 0, "しょーき選手": 0,
+    "をわん選手": 1, "ゆのん選手": 1, "たっつー選手": 1, "あめりなう選手": 1, "あいき選手": 1,
+    "ティーマ選手": 2, "りょうすけ選手": 2, "こころ選手": 2, "どらごん選手": 2, "ふぁみ選手": 2
+};
+let playerCards = {};
+
+let matches = {}; 
+let slotMapping = {}; 
+let currentActiveMatchId = null; 
+let currentDrawnSongs = []; 
+let isSurpriseFlags = [false, false, false];
+let spinInterval = null;
+let isThirdPlaceEnabled = false; 
+
+let tempScores = {};
+function saveTempScores() {
+    tempScores = {};
+    for(let i=0; i<3; i++) {
+        tempScores[i] = {
+            p1ka: document.getElementById(`p1-ka-${i}`) ? document.getElementById(`p1-ka-${i}`).value : 0,
+            p1fuka: document.getElementById(`p1-fuka-${i}`) ? document.getElementById(`p1-fuka-${i}`).value : 0,
+            p2ka: document.getElementById(`p2-ka-${i}`) ? document.getElementById(`p2-ka-${i}`).value : 0,
+            p2fuka: document.getElementById(`p2-fuka-${i}`) ? document.getElementById(`p2-fuka-${i}`).value : 0
+        };
+    }
+}
+function restoreTempScores() {
+    for(let i=0; i<3; i++) {
+        if(document.getElementById(`p1-ka-${i}`)) {
+            document.getElementById(`p1-ka-${i}`).value = tempScores[i].p1ka;
+            document.getElementById(`p1-fuka-${i}`).value = tempScores[i].p1fuka;
+            document.getElementById(`p2-ka-${i}`).value = tempScores[i].p2ka;
+            document.getElementById(`p2-fuka-${i}`).value = tempScores[i].p2fuka;
+        }
+    }
+}
+
+function shuffle(array) { let cur = array.length, rnd; while (cur != 0) { rnd = Math.floor(Math.random() * cur); cur--; [array[cur], array[rnd]] = [array[rnd], array[cur]]; } return array; }
+
+function initMatches() {
+    matches = {
+        1: { p1: null, p2: null, winner: null, next: 8, slot: 'p1', drawnSongs: null, initialDrawnSongs: null, isSurpriseFlags: null, initialSurpriseFlags: null, redraws: [], details: null }, 
+        2: { p1: null, p2: null, winner: null, next: 8, slot: 'p2', drawnSongs: null, initialDrawnSongs: null, isSurpriseFlags: null, initialSurpriseFlags: null, redraws: [], details: null },
+        3: { p1: null, p2: null, winner: null, next: 9, slot: 'p1', drawnSongs: null, initialDrawnSongs: null, isSurpriseFlags: null, initialSurpriseFlags: null, redraws: [], details: null }, 
+        4: { p1: null, p2: null, winner: null, next: 9, slot: 'p2', drawnSongs: null, initialDrawnSongs: null, isSurpriseFlags: null, initialSurpriseFlags: null, redraws: [], details: null },
+        5: { p1: null, p2: null, winner: null, next: 10, slot: 'p1', drawnSongs: null, initialDrawnSongs: null, isSurpriseFlags: null, initialSurpriseFlags: null, redraws: [], details: null }, 
+        6: { p1: null, p2: null, winner: null, next: 10, slot: 'p2', drawnSongs: null, initialDrawnSongs: null, isSurpriseFlags: null, initialSurpriseFlags: null, redraws: [], details: null },
+        7: { p1: null, p2: null, winner: null, next: 11, slot: 'p1', drawnSongs: null, initialDrawnSongs: null, isSurpriseFlags: null, initialSurpriseFlags: null, redraws: [], details: null }, 
+        8: { p1: null, p2: null, winner: null, next: 12, slot: 'p1', drawnSongs: null, initialDrawnSongs: null, isSurpriseFlags: null, initialSurpriseFlags: null, redraws: [], details: null },
+        9: { p1: null, p2: null, winner: null, next: 12, slot: 'p2', drawnSongs: null, initialDrawnSongs: null, isSurpriseFlags: null, initialSurpriseFlags: null, redraws: [], details: null }, 
+        10: { p1: null, p2: null, winner: null, next: 13, slot: 'p1', drawnSongs: null, initialDrawnSongs: null, isSurpriseFlags: null, initialSurpriseFlags: null, redraws: [], details: null },
+        11: { p1: null, p2: null, winner: null, next: 13, slot: 'p2', drawnSongs: null, initialDrawnSongs: null, isSurpriseFlags: null, initialSurpriseFlags: null, redraws: [], details: null }, 
+        12: { p1: null, p2: null, winner: null, next: 14, slot: 'p1', loserNext: 15, loserSlot: 'p1', drawnSongs: null, initialDrawnSongs: null, isSurpriseFlags: null, initialSurpriseFlags: null, redraws: [], details: null },
+        13: { p1: null, p2: null, winner: null, next: 14, slot: 'p2', loserNext: 15, loserSlot: 'p2', drawnSongs: null, initialDrawnSongs: null, isSurpriseFlags: null, initialSurpriseFlags: null, redraws: [], details: null }, 
+        14: { p1: null, p2: null, winner: null, next: null, slot: null, drawnSongs: null, initialDrawnSongs: null, isSurpriseFlags: null, initialSurpriseFlags: null, redraws: [], details: null },
+        15: { p1: null, p2: null, winner: null, next: null, slot: null, drawnSongs: null, initialDrawnSongs: null, isSurpriseFlags: null, initialSurpriseFlags: null, redraws: [], details: null, isThirdPlace: true }
+    };
+    playerCards = JSON.parse(JSON.stringify(defaultCards));
+}
+
+function toggleThirdPlace() {
+    isThirdPlaceEnabled = !isThirdPlaceEnabled;
+    const btn = document.getElementById('third-place-toggle-btn');
+    if (isThirdPlaceEnabled) { btn.innerText = "三位決定戦: ON"; btn.style.backgroundColor = "#ff9800"; btn.style.color = "#fff"; } 
+    else { btn.innerText = "三位決定戦: OFF"; btn.style.backgroundColor = "#111"; btn.style.color = "#ff9800"; }
+    renderBracket();
+}
+
+function shuffleAndStart() {
+    if(!confirm("新規に大会を開始しますか？")) return;
+    initMatches(); let shuf = shuffle([...playersList]);
+    matches[1].p1 = shuf[0]; matches[1].p2 = shuf[1]; matches[2].p1 = shuf[2]; matches[2].p2 = shuf[3];
+    matches[3].p1 = shuf[4]; matches[3].p2 = shuf[5]; matches[4].p1 = shuf[6]; matches[4].p2 = shuf[7];
+    matches[5].p1 = shuf[8]; matches[5].p2 = shuf[9]; matches[6].p1 = shuf[10]; matches[6].p2 = shuf[11];
+    matches[7].p1 = shuf[12]; matches[7].p2 = shuf[13]; matches[11].p2 = shuf[14] + " (シード)";
+    
+    slotMapping = {
+        's1': shuf[0], 's2': shuf[1], 's3': shuf[2], 's4': shuf[3], 's5': shuf[4], 's6': shuf[5], 's7': shuf[6], 's8': shuf[7],
+        's9': shuf[8], 's10': shuf[9], 's11': shuf[10], 's12': shuf[11], 's13': shuf[12], 's14': shuf[13], 's15': shuf[14] + " (シード)"
+    };
+    renderBracket(); renderResultsTable();
+}
+
+const startNodes = {
+    's1': { x: 160, y: 40, isLeft: true }, 's2': { x: 160, y: 110, isLeft: true }, 's3': { x: 160, y: 180, isLeft: true }, 's4': { x: 160, y: 250, isLeft: true },
+    's5': { x: 160, y: 320, isLeft: true }, 's6': { x: 160, y: 390, isLeft: true }, 's7': { x: 160, y: 460, isLeft: true }, 's8': { x: 160, y: 530, isLeft: true },
+    's9': { x: 1040, y: 40, isLeft: false }, 's10': { x: 1040, y: 110, isLeft: false }, 's11': { x: 1040, y: 180, isLeft: false }, 's12': { x: 1040, y: 250, isLeft: false },
+    's13': { x: 1040, y: 320, isLeft: false }, 's14': { x: 1040, y: 390, isLeft: false }, 's15': { x: 1040, y: 495, isLeft: false }
+};
+
+const bracketGraph = {
+    1: { x: 260, y: 75, prevP1: 's1', prevP2: 's2' }, 2: { x: 260, y: 215, prevP1: 's3', prevP2: 's4' },
+    3: { x: 260, y: 355, prevP1: 's5', prevP2: 's6' }, 4: { x: 260, y: 495, prevP1: 's7', prevP2: 's8' },
+    8: { x: 380, y: 145, prevP1: 1, prevP2: 2 }, 9: { x: 380, y: 425, prevP1: 3, prevP2: 4 },
+    12: { x: 500, y: 285, prevP1: 8, prevP2: 9 },
+    5: { x: 940, y: 75, prevP1: 's9', prevP2: 's10' }, 6: { x: 940, y: 215, prevP1: 's11', prevP2: 's12' },
+    7: { x: 940, y: 355, prevP1: 's13', prevP2: 's14' },
+    10: { x: 820, y: 145, prevP1: 5, prevP2: 6 }, 11: { x: 820, y: 425, prevP1: 7, prevP2: 's15' },
+    13: { x: 700, y: 285, prevP1: 10, prevP2: 11 },
+    14: { x: 600, y: 285, prevP1: 12, prevP2: 13 }
+};
+
+function isEliminated(name) {
+    if (!name || name === '---') return false;
+    const cleanName = name.replace(" (シード)", "");
+    let eliminated = false;
+    Object.keys(matches).forEach(id => {
+        if (id == 15) return; 
+        const m = matches[id];
+        if (m.winner) {
+            const p1Clean = m.p1 ? m.p1.replace(" (シード)", "") : "";
+            const p2Clean = m.p2 ? m.p2.replace(" (シード)", "") : "";
+            const winnerClean = m.winner.replace(" (シード)", "");
+            if ((p1Clean === cleanName || p2Clean === cleanName) && winnerClean !== cleanName) {
+                eliminated = true;
+            }
+        }
+    });
+    return eliminated;
+}
+
+function renderBracket(animatedMatchId = null) {
+    const container = document.getElementById('bracket-container'); 
+    container.innerHTML = `<svg id="bracket-svg"></svg>`;
+    
+    Object.keys(startNodes).forEach(sId => {
+        const p = startNodes[sId]; const playerName = slotMapping[sId];
+        const isLoser = isEliminated(playerName);
+        const div = document.createElement('div');
+        div.className = `player-node ${isLoser ? 'loser' : ''}`;
+        div.id = `node-${sId}`;
+        div.style.left = p.isLeft ? `20px` : `1040px`;
+        div.style.top = `${p.y - 22}px`; 
+        
+        const color = p.isLeft ? '#00bcd4' : '#e91e63';
+        div.innerHTML = `<div class="color-bar" style="background:${color}"></div><div class="name">${playerName || '---'}</div>`;
+        container.appendChild(div);
+    });
+
+    Object.keys(bracketGraph).forEach(id => {
+        const g = bracketGraph[id]; const m = matches[id];
+        const div = document.createElement('div');
+        div.className = `vs-btn ${m.winner ? 'completed' : ''}`;
+        div.style.left = `${g.x}px`; div.style.top = `${g.y}px`;
+        div.onclick = () => openMatch(id);
+        div.innerHTML = (id == 14) ? '👑' : 'VS';
+        container.appendChild(div);
+    });
+
+    if (isThirdPlaceEnabled) {
+        const m15 = matches[15]; const div15 = document.createElement('div');
+        div15.className = 'third-place-box'; div15.onclick = () => openMatch(15);
+        div15.innerHTML = `
+            <div style="font-size:12px; color:#ff9800; text-align:center; margin-bottom:5px;">3位決定戦</div>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span class="${m15.winner === m15.p1 ? 'winner' : ''}">${m15.p1 || '???'}</span>
+                <span style="color:#e73c5a; font-weight:bold;">VS</span>
+                <span class="${m15.winner === m15.p2 ? 'winner' : ''}">${m15.p2 || '???'}</span>
+            </div>
+        `;
+        container.appendChild(div15);
+    }
+
+    setTimeout(() => drawLines(animatedMatchId), 50);
+}
+
+function drawLines(animatedMatchId) {
+    const svg = document.getElementById('bracket-svg'); 
+    if(!svg) return; svg.innerHTML = '';
+    
+    const createPWTLine = (x1, y1, x2, y2, state, isAnimated) => {
+        const d = `M ${x1} ${y1} L ${x2} ${y1} L ${x2} ${y2}`;
+        const basePath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        basePath.setAttribute("d", d); basePath.setAttribute("fill", "none"); 
+        
+        let strokeColor = "#ffffff";
+        if (state === 'win') strokeColor = "#ff0000";
+        else if (state === 'lose') strokeColor = "#444444";
+        
+        basePath.setAttribute("stroke", strokeColor); 
+        basePath.setAttribute("stroke-width", "6");
+        
+        if (isAnimated && state === 'win') {
+            basePath.style.animation = "fadeIn 1s forwards"; 
+            basePath.style.opacity = "0";
+        }
+        svg.appendChild(basePath);
+
+        if (state === 'win') {
+            const dotPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            dotPath.setAttribute("d", d); dotPath.setAttribute("fill", "none"); 
+            dotPath.setAttribute("stroke", "#ffff00"); dotPath.setAttribute("stroke-width", "2"); 
+            dotPath.setAttribute("stroke-dasharray", "6 6");
+            if (isAnimated) {
+                dotPath.style.animation = "fadeIn 1s forwards";
+                dotPath.style.opacity = "0";
+            }
+            svg.appendChild(dotPath);
+        }
+    };
+
+    if(!document.getElementById('svg-anim-style')) {
+        const style = document.createElement('style');
+        style.id = 'svg-anim-style';
+        style.innerHTML = `@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }`;
+        document.head.appendChild(style);
+    }
+
+    Object.keys(bracketGraph).forEach(id => {
+        const g = bracketGraph[id]; const m = matches[id];
+        const winnerClean = m.winner ? m.winner.replace(" (シード)", "") : null;
+        
+        let prevX1, prevY1, state1;
+        if (typeof g.prevP1 === 'string') {
+            prevX1 = startNodes[g.prevP1].x; prevY1 = startNodes[g.prevP1].y;
+            const p1Name = slotMapping[g.prevP1].replace(" (シード)", "");
+            if (winnerClean == null) state1 = 'normal';
+            else if (winnerClean === p1Name) state1 = 'win';
+            else state1 = 'lose';
+        } else {
+            prevX1 = bracketGraph[g.prevP1].x; prevY1 = bracketGraph[g.prevP1].y;
+            const prevMatch = matches[g.prevP1];
+            const prevWinnerClean = prevMatch.winner ? prevMatch.winner.replace(" (シード)", "") : null;
+            if (prevWinnerClean == null) state1 = 'normal';
+            else if (winnerClean == null) state1 = 'win';
+            else if (winnerClean === prevWinnerClean) state1 = 'win';
+            else state1 = 'lose';
+        }
+        createPWTLine(prevX1, prevY1, g.x, g.y, state1, (id == animatedMatchId));
+
+        let prevX2, prevY2, state2;
+        if (typeof g.prevP2 === 'string') {
+            prevX2 = startNodes[g.prevP2].x; prevY2 = startNodes[g.prevP2].y;
+            const p2Name = slotMapping[g.prevP2].replace(" (シード)", "");
+            if (winnerClean == null) state2 = 'normal';
+            else if (winnerClean === p2Name) state2 = 'win';
+            else state2 = 'lose';
+        } else {
+            prevX2 = bracketGraph[g.prevP2].x; prevY2 = bracketGraph[g.prevP2].y;
+            const prevMatch = matches[g.prevP2];
+            const prevWinnerClean = prevMatch.winner ? prevMatch.winner.replace(" (シード)", "") : null;
+            if (prevWinnerClean == null) state2 = 'normal';
+            else if (winnerClean == null) state2 = 'win';
+            else if (winnerClean === prevWinnerClean) state2 = 'win';
+            else state2 = 'lose';
+        }
+        createPWTLine(prevX2, prevY2, g.x, g.y, state2, (id == animatedMatchId));
+    });
+
+    if (matches[14].winner) {
+        createPWTLine(600, 285, 600, 240, 'win', (14 == animatedMatchId));
+        const crown = document.createElement('div');
+        crown.style.position = 'absolute'; crown.style.left = '600px'; crown.style.top = '210px';
+        crown.style.transform = 'translate(-50%, -50%)'; crown.style.fontSize = '40px';
+        crown.innerHTML = '👑';
+        if(14 == animatedMatchId) { crown.style.opacity = '0'; crown.style.animation = 'fadeIn 1s forwards'; }
+        document.getElementById('bracket-container').appendChild(crown);
+    }
+}
+
+function openMatch(id) {
+    const m = matches[id];
+    if (!m.p1 || !m.p2) { alert("対戦選手が揃っていません！"); return; }
+    currentActiveMatchId = id;
+
+    if (m.winner) { openReplayModal(id); return; }
+
+    const titleText = (id == 15) ? "三位決定戦" : `Match ${id}`;
+    document.getElementById('modal-match-title').innerText = titleText;
+    document.getElementById('modal-p1-name').innerText = m.p1;
+    document.getElementById('modal-p2-name').innerText = m.p2;
+    document.getElementById('finals-admin-panel').style.display = "none";
+    document.getElementById('modal-content-box').style.background = "var(--panel-bg)";
+    
+    if (m.drawnSongs && m.drawnSongs.length === 3) {
+        currentDrawnSongs = [...m.drawnSongs];
+        document.getElementById('draw-btn').style.display = "none";
+        document.getElementById('pachinko-area').style.display = "none";
+        document.getElementById('finals-admin-btn').style.display = "none";
+        generateInputFields();
+        document.getElementById('confirm-btn').style.display = "block";
+    } else {
+        document.getElementById('draw-btn').style.display = "block";
+        document.getElementById('pachinko-area').style.display = "none";
+        document.getElementById('songs-input-container').innerHTML = "";
+        document.getElementById('confirm-btn').style.display = "none";
+        
+        const title = document.getElementById('pachinko-title');
+        title.innerText = "";
+        
+        [0,1,2].forEach(i => { let r = document.getElementById(`reel-${i}`); r.className = "reel"; r.innerText = "???"; r.style.transform = "scale(1)"; });
+        document.getElementById('finals-admin-btn').style.display = (id == 14 || id == 15) ? "block" : "none";
+    }
+    document.getElementById('match-modal').style.display = "flex";
+}
+
+function openReplayModal(id) {
+    const m = matches[id];
+    currentDrawnSongs = [...m.drawnSongs];
+    isSurpriseFlags = m.isSurpriseFlags || [false, false, false];
+
+    const titleText = (id == 15) ? "三位決定戦 (結果・リプレイ)" : `Match ${id} (結果・リプレイ)`;
+    document.getElementById('modal-match-title').innerText = titleText;
+    document.getElementById('modal-p1-name').innerText = m.p1;
+    document.getElementById('modal-p2-name').innerText = m.p2;
+    document.getElementById('finals-admin-panel').style.display = "none";
+    document.getElementById('finals-admin-btn').style.display = "none";
+    document.getElementById('modal-content-box').style.background = "var(--panel-bg)";
+    
+    document.getElementById('draw-btn').style.display = "none";
+    document.getElementById('pachinko-area').style.display = "none";
+    document.getElementById('confirm-btn').style.display = "none";
+    
+    generateReplayInputFields();
+    document.getElementById('match-modal').style.display = "flex";
+}
+
+function closeModal() { document.getElementById('match-modal').style.display = "none"; if(spinInterval) clearInterval(spinInterval); }
+function toggleAdminPanel() { let p = document.getElementById('finals-admin-panel'); p.style.display = (p.style.display === "none" || p.style.display === "") ? "block" : "none"; }
+
+function startPachinko(isReplay = false) {
+    document.getElementById('draw-btn').style.display = "none"; document.getElementById('finals-admin-btn').style.display = "none";
+    document.getElementById('finals-admin-panel').style.display = "none"; document.getElementById('pachinko-area').style.display = "block";
+    document.getElementById('songs-input-container').innerHTML = ""; 
+    document.getElementById('confirm-btn').style.display = "none";
+
+    const m = matches[currentActiveMatchId];
+
+    if (!isReplay) {
+        currentDrawnSongs = []; isSurpriseFlags = [false, false, false]; let pool = shuffle([...songsList]);
+        for(let i=0; i<3; i++) {
+            let customStr = document.getElementById(`admin-song-${i}`)?.value.trim() || "";
+            if ((currentActiveMatchId == 14 || currentActiveMatchId == 15) && customStr !== "") {
+                let customArr = customStr.split(/,|、/).map(s => s.trim()).filter(s => s !== "");
+                if(customArr.length > 0) { currentDrawnSongs.push(customArr[Math.floor(Math.random() * customArr.length)]); isSurpriseFlags[i] = true; continue; }
+            }
+            currentDrawnSongs.push(pool.pop());
+        }
+        m.drawnSongs = [...currentDrawnSongs];
+        m.isSurpriseFlags = [...isSurpriseFlags];
+        m.initialDrawnSongs = [...currentDrawnSongs];
+        m.initialSurpriseFlags = [...isSurpriseFlags];
+    } else {
+        currentDrawnSongs = [...(m.initialDrawnSongs || m.drawnSongs)];
+        isSurpriseFlags = [...(m.initialSurpriseFlags || m.isSurpriseFlags || [false, false, false])];
+        const title = document.getElementById('pachinko-title');
+        title.innerText = "";
+    }
+
+    let reels = [document.getElementById('reel-0'), document.getElementById('reel-1'), document.getElementById('reel-2')];
+    reels.forEach(r => { r.className = "reel"; r.innerText = "???"; r.style.transform = "scale(1)"; });
+
+    spinInterval = setInterval(() => {
+        reels.forEach((r, i) => { if (!r.classList.contains('stopped') && !r.classList.contains('mystery')) { r.innerText = songsList[Math.floor(Math.random() * songsList.length)]; } });
+    }, 40);
+
+    setTimeout(() => stopReel(0), 1000); 
+    setTimeout(() => stopReel(1), 2500); 
+    setTimeout(() => { stopReel(2); clearInterval(spinInterval); triggerBigEffect(isReplay); }, 4500);
+}
+
+function stopReel(index) {
+    let reel = document.getElementById(`reel-${index}`);
+    if(isSurpriseFlags[index]) { reel.innerText = "？？？"; reel.classList.add('mystery'); } 
+    else { reel.innerText = currentDrawnSongs[index]; reel.classList.add('stopped'); }
+    confetti({ particleCount: 15, spread: 60, origin: { y: 0.6 } });
+}
+
+function triggerBigEffect(isReplay = false) {
+    const modalBox = document.getElementById('modal-content-box'); const gekiatsu = document.getElementById('gekiatsu-text');
+    let hasSurprise = isSurpriseFlags.includes(true);
+    const resultTitle = (currentActiveMatchId == 14) ? "🎯 決勝戦 課題曲決定 🎯" : (currentActiveMatchId == 15) ? "🎯 三位決定戦 課題曲決定 🎯" : "🎯 課題曲決定 🎯";
+    const m = matches[currentActiveMatchId];
+
+    if(!hasSurprise) {
+        modalBox.style.animation = "modalShake 0.5s infinite";
+        gekiatsu.className = "gekiatsu"; gekiatsu.innerText = ""; 
+        let end = Date.now() + 2000;
+        (function frame() { confetti({ particleCount: 10, startVelocity: 40, spread: 360, origin: { x: Math.random(), y: Math.random() - 0.2 }, zIndex: 2000 }); if (Date.now() < end) requestAnimationFrame(frame); }());
+
+        setTimeout(() => {
+            modalBox.style.animation = "none"; document.getElementById('pachinko-title').innerText = resultTitle;
+            document.getElementById('pachinko-title').style.animation = "none"; document.getElementById('pachinko-title').style.color = "gold";
+            
+            currentDrawnSongs = [...m.drawnSongs]; 
+            if (m.winner) { 
+                generateReplayInputFields(); 
+            } else { 
+                generateInputFields(); document.getElementById('confirm-btn').style.display = "block"; 
+                if (isReplay) restoreTempScores();
+            }
+        }, 2000);
+    } else {
+        setTimeout(() => { modalBox.style.background = "#050505"; document.getElementById('pachinko-title').innerText = ""; document.getElementById('pachinko-title').style.color = "#fff"; document.getElementById('pachinko-title').style.animation = "none"; }, 500);
+        setTimeout(() => {
+            modalBox.style.animation = "modalShake 0.8s infinite"; gekiatsu.className = "gekiatsu kourin"; gekiatsu.innerText = ""; 
+            let end = Date.now() + 2500;
+            (function frame() { confetti({ particleCount: 15, colors: ['#ff00ff', '#00ffff', '#ffffff'], startVelocity: 50, spread: 360, origin: { x: Math.random(), y: Math.random() - 0.2 }, zIndex: 2000 }); if (Date.now() < end) requestAnimationFrame(frame); }());
+            for(let i=0; i<3; i++) { if(isSurpriseFlags[i]) { let reel = document.getElementById(`reel-${i}`); reel.classList.remove('mystery'); reel.classList.add('revealed'); reel.innerText = currentDrawnSongs[i]; } }
+        }, 2000);
+        setTimeout(() => {
+            modalBox.style.animation = "none"; modalBox.style.background = "var(--panel-bg)";
+            document.getElementById('pachinko-title').innerText = resultTitle; document.getElementById('pachinko-title').style.color = "gold";
+            
+            currentDrawnSongs = [...m.drawnSongs];
+            if (m.winner) { 
+                generateReplayInputFields(); 
+            } else { 
+                generateInputFields(); document.getElementById('confirm-btn').style.display = "block"; 
+                if (isReplay) restoreTempScores();
+            }
+        }, 5000);
+    }
+}
+
+function playRedrawAnimation(playerName, oldSong, newSong, callback) {
+    const overlay = document.getElementById('redraw-overlay'); const cutinBar = document.getElementById('cutin-bar'); const cutinText = document.getElementById('cutin-text');
+    const target = document.getElementById('redraw-target'); const arrow = document.getElementById('redraw-arrow'); const reel = document.getElementById('redraw-reel'); const gekiatsu = document.getElementById('redraw-gekiatsu');
+
+    overlay.style.display = "flex"; cutinText.innerText = `🔥 ${playerName.substring(0,5)} カード発動!! 🔥`; target.innerText = oldSong; target.style.animation = "none"; target.style.opacity = "1"; target.style.color = "#aaa"; arrow.style.display = "none"; reel.style.display = "none"; reel.classList.remove('stopped'); gekiatsu.style.display = "none"; gekiatsu.style.animation = "none";
+    cutinBar.style.animation = 'none'; cutinBar.offsetHeight; cutinBar.style.animation = 'cutinAnim 1.5s ease-out forwards';
+
+    setTimeout(() => { target.style.animation = "shatterAnim 0.6s forwards"; }, 1500);
+    let spinInt; setTimeout(() => { arrow.style.display = "block"; reel.style.display = "block"; spinInt = setInterval(() => { reel.innerText = songsList[Math.floor(Math.random() * songsList.length)]; }, 40); }, 2100);
+
+    setTimeout(() => {
+        clearInterval(spinInt); reel.innerText = newSong; reel.classList.add('stopped');
+        gekiatsu.style.display = "block"; gekiatsu.innerText = "";
+        confetti({ particleCount: 200, spread: 160, origin: { y: 0.6 }, colors: ['#ffd700', '#ff0000', '#ffffff'], zIndex: 3000 });
+        setTimeout(() => { overlay.style.display = "none"; if (callback) callback(); }, 2000);
+    }, 4500);
+}
+
+function redrawSong(songIndex, playerSlot) {
+    const m = matches[currentActiveMatchId];
+    let rawPlayerName = m[playerSlot].replace(" (シード)", "");
+    let currentCards = playerCards[rawPlayerName];
+
+    if (currentCards <= 0) { alert("曲変更カードがありません！"); return; }
+    let oldSong = currentDrawnSongs[songIndex];
+
+    if (!confirm(`${rawPlayerName} 選手の【曲変更カード】を使用しますか？\n（残り ${currentCards} 枚 → ${currentCards - 1} 枚に減ります）`)) { return; }
+
+    saveTempScores(); 
+
+    playerCards[rawPlayerName]--;
+    let availableSongs = songsList.filter(s => !currentDrawnSongs.includes(s) && s !== oldSong);
+    let newSong = availableSongs[Math.floor(Math.random() * availableSongs.length)];
+    
+    m.redraws = m.redraws || []; m.redraws.push({ playerName: rawPlayerName, oldSong: oldSong, newSong: newSong });
+
+    playRedrawAnimation(rawPlayerName, oldSong, newSong, () => {
+        currentDrawnSongs[songIndex] = newSong; m.drawnSongs = [...currentDrawnSongs];
+        generateInputFields(); restoreTempScores(); 
+    });
+}
+
+function replayRedraw(idx) {
+    const m = matches[currentActiveMatchId];
+    if(!m || !m.redraws || !m.redraws[idx]) return;
+    const r = m.redraws[idx];
+    document.getElementById('songs-input-container').innerHTML = ""; document.getElementById('confirm-btn').style.display = "none";
+    
+    playRedrawAnimation(r.playerName, r.oldSong, r.newSong, () => {
+        currentDrawnSongs = [...m.drawnSongs];
+        if (m.winner) { generateReplayInputFields(); } 
+        else { generateInputFields(); document.getElementById('confirm-btn').style.display = "block"; restoreTempScores(); }
+    });
+}
+
+function generateInputFields() {
+    let html = ""; const m = matches[currentActiveMatchId];
+    const p1Raw = m.p1.replace(" (シード)", ""); const p2Raw = m.p2.replace(" (シード)", "");
+    const p1Short = p1Raw.substring(0, 5); const p2Short = p2Raw.substring(0, 5);
+
+    html += `<div class="replay-btn-group" style="margin-bottom: 15px;">
+        <button class="btn-replay" onclick="saveTempScores(); startPachinko(true)">🎬 最初の曲抽選をリプレイ</button>`;
+    if (m.redraws && m.redraws.length > 0) {
+        m.redraws.forEach((r, idx) => { html += `<button class="btn-replay btn-replay-redraw" onclick="saveTempScores(); replayRedraw(${idx})">⚔️ ${r.playerName.substring(0,5)}の再抽選をリプレイ</button>`; });
+    }
+    html += `</div>`;
+
+    currentDrawnSongs.forEach((song, i) => {
+        let p1Cards = playerCards[p1Raw] || 0; let p2Cards = playerCards[p2Raw] || 0;
+        let p1BtnHTML = p1Cards > 0 ? `<button onclick="redrawSong(${i}, 'p1')" class="card-btn">${p1Short} 再抽選 (残${p1Cards})</button>` : `<span class="no-card">${p1Short} 残0</span>`;
+        let p2BtnHTML = p2Cards > 0 ? `<button onclick="redrawSong(${i}, 'p2')" class="card-btn">${p2Short} 再抽選 (残${p2Cards})</button>` : `<span class="no-card">${p2Short} 残0</span>`;
+
+        html += `
+        <div class="song-section">
+            <div class="song-title">
+                <div class="song-title-text">🎵 曲${i+1} : <span style="color:#000;">${song}</span></div>
+                <div class="card-actions">${p1BtnHTML}${p2BtnHTML}</div>
+            </div>
+            <div class="score-row">
+                <div class="score-col"><span>${p1Short}</span> 可<input type="number" id="p1-ka-${i}" min="0" value="0"> 不可<input type="number" id="p1-fuka-${i}" min="0" value="0"></div>
+                <div class="score-col"><span>${p2Short}</span> 可<input type="number" id="p2-ka-${i}" min="0" value="0"> 不可<input type="number" id="p2-fuka-${i}" min="0" value="0"></div>
+            </div>
+        </div>`;
+    });
+    document.getElementById('songs-input-container').innerHTML = html;
+}
+
+function generateReplayInputFields() {
+    let html = ""; const m = matches[currentActiveMatchId];
+    const p1Raw = m.p1.replace(" (シード)", ""); const p2Raw = m.p2.replace(" (シード)", "");
+    const p1Short = p1Raw.substring(0, 5); const p2Short = p2Raw.substring(0, 5);
+
+    html += `
+    <div class="replay-btn-group">
+        <button class="btn-replay" onclick="startPachinko(true)">🎬 最初の曲抽選をリプレイ</button>
+        <button class="btn-replay" onclick="showWinnerAnimation('${m.winner}')">🏆 勝者発表をリプレイ</button>`;
+        
+    if (m.redraws && m.redraws.length > 0) {
+        m.redraws.forEach((r, idx) => { html += `<button class="btn-replay btn-replay-redraw" onclick="replayRedraw(${idx})">⚔️ ${r.playerName.substring(0,5)}の再抽選をリプレイ</button>`; });
+    }
+    html += `</div>`;
+
+    let songScores = m.details.songScores || [{}, {}, {}];
+
+    currentDrawnSongs.forEach((song, i) => {
+        let sScore = songScores[i] || {};
+        let p1k = sScore.p1_ka !== undefined ? sScore.p1_ka : '-'; let p1f = sScore.p1_fuka !== undefined ? sScore.p1_fuka : '-';
+        let p2k = sScore.p2_ka !== undefined ? sScore.p2_ka : '-'; let p2f = sScore.p2_fuka !== undefined ? sScore.p2_fuka : '-';
+
+        html += `
+        <div class="song-section" style="opacity: 0.9;">
+            <div class="song-title">
+                <div class="song-title-text">🎵 曲${i+1} : <span style="color:#000;">${song}</span></div>
+                <div class="card-actions"><span class="no-card" style="background:#ddd;">結果確定済み</span></div>
+            </div>
+            <div class="score-row">
+                <div class="score-col"><span>${p1Short}</span> 可 <input type="text" readonly value="${p1k}" style="background:#eee;"> 不可 <input type="text" readonly value="${p1f}" style="background:#eee;"></div>
+                <div class="score-col"><span>${p2Short}</span> 可 <input type="text" readonly value="${p2k}" style="background:#eee;"> 不可 <input type="text" readonly value="${p2f}" style="background:#eee;"></div>
+            </div>
+        </div>`;
+    });
+    document.getElementById('songs-input-container').innerHTML = html;
+}
+
+function confirmResult() {
+    let p1_total_ka = 0, p1_total_fuka = 0; let p2_total_ka = 0, p2_total_fuka = 0; let songScores = [];
+
+    for(let i=0; i<3; i++){
+        let p1k = parseInt(document.getElementById(`p1-ka-${i}`).value) || 0; let p1f = parseInt(document.getElementById(`p1-fuka-${i}`).value) || 0;
+        let p2k = parseInt(document.getElementById(`p2-ka-${i}`).value) || 0; let p2f = parseInt(document.getElementById(`p2-fuka-${i}`).value) || 0;
+        p1_total_ka += p1k; p1_total_fuka += p1f; p2_total_ka += p2k; p2_total_fuka += p2f;
+        songScores.push({ p1_ka: p1k, p1_fuka: p1f, p2_ka: p2k, p2_fuka: p2f });
+    }
+    const p1_loss = (p1_total_ka * 1) + (p1_total_fuka * 2); const p2_loss = (p2_total_ka * 1) + (p2_total_fuka * 2);
+    if (p1_loss === p2_loss) { alert("同点です！サドンデス等でスコアを調整してください。"); return; }
+
+    const m = matches[currentActiveMatchId];
+    let winnerName = (p1_loss < p2_loss) ? m.p1 : m.p2; let loserName = (p1_loss < p2_loss) ? m.p2 : m.p1;
+    m.winner = winnerName; m.isSurpriseFlags = [...isSurpriseFlags]; 
+    m.details = { 
+        p1_ka: p1_total_ka, p1_fuka: p1_total_fuka, p1_loss: p1_loss, p2_ka: p2_total_ka, p2_fuka: p2_total_fuka, p2_loss: p2_loss, 
+        songs: [...currentDrawnSongs], songScores: songScores 
+    };
+    
+    if (m.next) { matches[m.next][m.slot] = winnerName.replace(" (シード)", ""); }
+    if (m.loserNext) { matches[m.loserNext][m.loserSlot] = loserName.replace(" (シード)", ""); }
+
+    closeModal(); renderBracket(currentActiveMatchId);
+    
+    setTimeout(() => { 
+        showWinnerAnimation(winnerName, () => {
+            renderResultsTable(); 
+            if (currentActiveMatchId == 14) alert(`🎉 決勝戦終了！優勝は ${winnerName} です！おめでとうございます！ 🎉`); 
+            else if (currentActiveMatchId == 15) alert(`🥉 三位決定戦終了！第3位は ${winnerName} です！ 🥉`);
+        });
+    }, 1000);
+}
+
+let winnerOverlayClickCallback = null;
+function showWinnerAnimation(winnerName, callback) {
+    const overlay = document.getElementById('winner-overlay'); const text = document.getElementById('winner-name-text');
+    text.innerHTML = `勝者<br><span>${winnerName.replace(" (シード)", "")}</span> ！！`;
+    text.style.animation = 'none'; text.offsetHeight; text.style.animation = 'winnerZoom 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards';
+    overlay.style.display = 'flex';
+    
+    confetti({ particleCount: 200, spread: 100, origin: { y: 0.6 }, zIndex: 4000 });
+    setTimeout(() => confetti({ particleCount: 150, spread: 120, origin: { y: 0.5 }, zIndex: 4000 }), 500);
+    setTimeout(() => confetti({ particleCount: 150, spread: 140, origin: { y: 0.4 }, zIndex: 4000 }), 1000);
+
+    winnerOverlayClickCallback = () => { overlay.style.display = 'none'; if (callback) callback(); };
+}
+
+function closeWinnerAnimation() {
+    if (winnerOverlayClickCallback) { let cb = winnerOverlayClickCallback; winnerOverlayClickCallback = null; cb(); }
+}
+
+function renderResultsTable() {
+    const tbody = document.getElementById('results-table-body'); tbody.innerHTML = ''; let hasCompleted = false;
+    Object.keys(matches).forEach(id => {
+        const m = matches[id];
+        if (m.winner && m.details) {
+            hasCompleted = true; const d = m.details; const tr = document.createElement('tr');
+            let displayId = (id == 15) ? "3位決定戦" : `M${id}`;
+            tr.innerHTML = `<td><strong>${displayId}</strong></td><td style="text-align:left; font-size:12px;"><span class="${m.winner === m.p1 ? 'table-winner' : ''}">${m.p1}<br>(可:${d.p1_ka} 不可:${d.p1_fuka} / 失:${d.p1_loss})</span><br><span style="color:#bbb;">--- vs ---</span><br><span class="${m.winner === m.p2 ? 'table-winner' : ''}">${m.p2}<br>(可:${d.p2_ka} 不可:${d.p2_fuka} / 失:${d.p2_loss})</span></td><td style="font-size:12px; text-align:left;">1: ${d.songs[0]}<br>2: ${d.songs[1]}<br>3: ${d.songs[2]}</td><td class="table-winner">${m.winner}</td>`;
+            tbody.appendChild(tr);
+        }
+    });
+    if (!hasCompleted) tbody.innerHTML = `<tr><td colspan="4">まだ完了した試合はありません</td></tr>`;
+}
+
+function exportToTxt() {
+    const saveData = { matches: matches, slotMapping: slotMapping, playerCards: playerCards, isThirdPlaceEnabled: isThirdPlaceEnabled };
+    const blob = new Blob([JSON.stringify(saveData, null, 2)], { type: "text/plain;charset=utf-8" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "darkness_cup_data.txt"; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+
+function importFromTxt(input) {
+    const file = input.files[0]; if (!file) return; const reader = new FileReader();
+    reader.onload = function(e) { 
+        try { 
+            const data = JSON.parse(e.target.result); 
+            if(data.matches && data.playerCards) { matches = data.matches; playerCards = data.playerCards; isThirdPlaceEnabled = data.isThirdPlaceEnabled || false; slotMapping = data.slotMapping || {}; } 
+            else { matches = data; playerCards = JSON.parse(JSON.stringify(defaultCards)); }
+
+            if (!matches[15]) {
+                matches[15] = { p1: null, p2: null, winner: null, next: null, slot: null, drawnSongs: null, initialDrawnSongs: null, isSurpriseFlags: null, initialSurpriseFlags: null, redraws: [], details: null, isThirdPlace: true };
+                if (matches[12]) { matches[12].loserNext = 15; matches[12].loserSlot = 'p1'; }
+                if (matches[13]) { matches[13].loserNext = 15; matches[13].loserSlot = 'p2'; }
+            }
+            
+            Object.keys(matches).forEach(key => { 
+                if(!matches[key].redraws) matches[key].redraws = []; 
+                if(matches[key].drawnSongs && !matches[key].initialDrawnSongs) {
+                    matches[key].initialDrawnSongs = [...matches[key].drawnSongs];
+                    matches[key].initialSurpriseFlags = matches[key].isSurpriseFlags ? [...matches[key].isSurpriseFlags] : [false, false, false];
+                }
+            });
+
+            if(Object.keys(slotMapping).length === 0) {
+                slotMapping = { 's1': matches[1].p1, 's2': matches[1].p2, 's3': matches[2].p1, 's4': matches[2].p2, 's5': matches[3].p1, 's6': matches[3].p2, 's7': matches[4].p1, 's8': matches[4].p2, 's9': matches[5].p1, 's10': matches[5].p2, 's11': matches[6].p1, 's12': matches[6].p2, 's13': matches[7].p1, 's14': matches[7].p2, 's15': matches[11].p2 };
+            }
+
+            const btn = document.getElementById('third-place-toggle-btn');
+            if (isThirdPlaceEnabled) { btn.innerText = "三位決定戦: ON"; btn.style.backgroundColor = "#ff9800"; btn.style.color = "#fff"; } 
+            else { btn.innerText = "三位決定戦: OFF"; btn.style.backgroundColor = "#111"; btn.style.color = "#ff9800"; }
+            
+            renderBracket(); renderResultsTable(); alert("復元しました！"); 
+        } catch (err) { alert("読み込み失敗"); } 
+    };
+    reader.readAsText(file); input.value = "";
+}
+
+function downloadBracketImage() {
+    const targetElement = document.getElementById('capture-area');
+    html2canvas(targetElement, { backgroundColor: "#161625", scale: 2 }).then(canvas => {
+        const link = document.createElement('a'); link.download = 'DarknessKasaiCup_Bracket.png'; link.href = canvas.toDataURL("image/png"); link.click();
+    }).catch(err => { alert("画像の生成に失敗しました。"); console.error(err); });
+}
+
+initMatches(); renderBracket(); renderResultsTable();
+</script>
+</body>
+</html>
