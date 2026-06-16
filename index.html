@@ -4,13 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>第2回Darknessカサイカップ</title>
-    <!-- 紙吹雪ライブラリ -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
-    <!-- 画像化ライブラリ -->
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
     <style>
         :root { 
-            --bg-color: #161625; /* PWT風ダークネイビー */
+            --bg-color: #161625; 
             --panel-bg: #ffffff; 
             --accent: #e73c5a; 
             --text-main: #212529; 
@@ -24,30 +22,32 @@
             color: #fff; 
             font-family: 'Helvetica Neue', Arial, Meiryo, sans-serif; 
             margin: 0; padding: 20px; 
+            /* 横揺れ防止 */
+            overflow-x: hidden;
         }
         h1 { text-align: center; color: #ffd700; font-size: 2.2em; margin-bottom: 20px; text-shadow: 2px 2px 0px #000, 0 0 10px #ff9800; }
         .controls { text-align: center; margin-bottom: 20px; background: rgba(0,0,0,0.5); padding: 15px; border-radius: 8px; border: 2px solid #555; display: flex; justify-content: center; align-items: center; gap: 15px; flex-wrap: wrap; }
         button { background-color: #ffffff; color: var(--accent); border: 2px solid var(--accent); padding: 8px 16px; font-size: 14px; cursor: pointer; border-radius: 5px; font-weight: bold; transition: 0.2s; }
         button:hover { background-color: var(--accent); color: #fff; }
 
-        /* PWT風トーナメント表エリア（スマホは横スクロールで快適に） */
-        .bracket-wrapper { 
+        /* PWT風トーナメント表エリア（スマホ常時フィット・ズーム対応） */
+        #capture-area { 
             width: 100%; 
-            overflow-x: auto; 
-            -webkit-overflow-scrolling: touch; 
-            padding: 20px 0; 
+            /* 縮小時に線が切り取られないように visible に設定 */
+            overflow: visible; 
+            background-color: var(--bg-color); 
+            background-image: linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
+            background-size: 30px 30px;
+            margin: 0 auto;
+            padding: 20px 0;
         }
         .bracket-container { 
             position: relative; 
-            margin: 0 auto; 
             width: 1200px; 
-            height: 600px; 
-            /* 画像出力用に背景を設定 */
-            background-color: var(--bg-color); 
-            background-image: 
-                linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
-            background-size: 30px 30px;
+            background: transparent; 
+            margin: 0 auto;
+            /* スケール計算用の基準高さを確保 */
+            min-height: 600px; 
         }
         #bracket-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
         
@@ -60,7 +60,6 @@
         }
         .player-node .color-bar { width: 12px; height: 100%; border-right: 2px solid #333; }
         .player-node .name { padding-left: 8px; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 115px; }
-        .player-node.loser { filter: brightness(0.4) grayscale(1); } /* 敗退者は暗くなる */
 
         /* VS結節点（対戦ボタン） */
         .vs-btn {
@@ -95,7 +94,7 @@
         #finals-admin-panel { display: none; background: #333; color: #fff; padding: 15px; border-radius: 6px; text-align: left; margin-bottom: 15px; font-size: 12px; }
         #finals-admin-panel input { width: 100%; padding: 5px; margin: 5px 0 10px 0; border-radius: 4px; border: 1px solid #555; background: #222; color: #fff; }
         
-        /* 🎰 パチンコ・激アツ演出CSS 🎰 */
+        /* 🎰 パチンコ演出CSS 🎰 */
         #pachinko-area { display: none; margin-top: 15px; }
         .flash-text { color: red; font-size: 28px; font-weight: 900; text-shadow: 0 0 10px yellow, 2px 2px 0 #000; animation: flashAnim 0.1s infinite alternate; margin-bottom: 10px; }
         @keyframes flashAnim { from { opacity: 1; transform: scale(1); color: red; } to { opacity: 0.8; transform: scale(1.1); color: yellow; } }
@@ -203,9 +202,8 @@
         <button onclick="downloadBracketImage()" style="background-color: #2196F3; color: white; border-color: #2196F3;">📸 トーナメント表を画像保存</button>
     </div>
 
-    <!-- PWT風 対戦ツリーエリア（横スクロール対応） -->
-    <div class="bracket-wrapper">
-        <div class="bracket-container" id="bracket-container">
+    <div id="capture-area">
+        <div class="bracket-container" id="bracket-container" data-base-height="600">
             <svg id="bracket-svg"></svg>
         </div>
     </div>
@@ -218,7 +216,6 @@
         </table>
     </div>
 
-    <!-- 対戦・スコア入力モーダル -->
     <div class="modal-overlay" id="match-modal">
         <div class="modal-content" id="modal-content-box">
             <span style="position: absolute; top:10px; right:15px; font-size:24px; cursor:pointer; z-index:999; color:#888;" onclick="closeModal()">&times;</span>
@@ -257,7 +254,6 @@
         </div>
     </div>
 
-    <!-- ⚔️ 再抽選アニメーション用オーバーレイ ⚔️ -->
     <div id="redraw-overlay">
         <div id="cutin-bar" class="cutin-bar">
             <span id="cutin-text" class="cutin-text">をわん選手 カード発動!!</span>
@@ -268,7 +264,6 @@
         <div id="redraw-gekiatsu" class="gekiatsu" style="display:none;"></div>
     </div>
 
-    <!-- 🏆 勝者発表オーバーレイ 🏆 -->
     <div id="winner-overlay" onclick="closeWinnerAnimation()">
         <div id="winner-name-text" class="winner-announce-text">勝者<br><span>〇〇選手</span> ！！</div>
         <div class="click-to-close">画面をクリックして次へ進む</div>
@@ -293,8 +288,42 @@ let isSurpriseFlags = [false, false, false];
 let spinInterval = null;
 let isThirdPlaceEnabled = false; 
 
-// スケール処理は廃止し、リサイズ時は線の再描画のみ行う
-window.addEventListener('resize', () => { drawLines(); });
+// 📱 スマホ対応: 賢いズーム制御＆完全フィット処理 📱
+function updateBracketScale() {
+    const wrapper = document.getElementById('capture-area');
+    const container = document.getElementById('bracket-container');
+    if (!wrapper || !container) return;
+
+    // 指で拡大（ピンチズーム）している最中は、再計算をスキップして追従させない
+    if (window.visualViewport && window.visualViewport.scale !== 1) {
+        return;
+    }
+
+    const baseWidth = 1200;
+    const baseHeight = parseFloat(container.getAttribute('data-base-height')) || 600;
+    
+    // 論理的な画面幅を使用（ズーム操作の影響を受けにくい）
+    const screenWidth = document.documentElement.clientWidth;
+    const padding = 20; 
+    const availableWidth = screenWidth - padding;
+
+    if (availableWidth < baseWidth) {
+        const scale = availableWidth / baseWidth;
+        container.style.transform = `scale(${scale})`;
+        container.style.transformOrigin = "top center";
+        // 縮小した分、親要素の高さを詰める（線がはみ出ても表示されるようoverflowはvisible）
+        wrapper.style.height = `${baseHeight * scale}px`;
+    } else {
+        container.style.transform = "scale(1)";
+        container.style.transformOrigin = "top center";
+        wrapper.style.height = `${baseHeight}px`;
+    }
+}
+window.addEventListener('resize', () => { 
+    updateBracketScale(); 
+    drawLines(); 
+});
+
 
 let tempScores = {};
 function saveTempScores() {
@@ -384,34 +413,14 @@ const bracketGraph = {
     14: { x: 600, y: 285, prevP1: 12, prevP2: 13 }
 };
 
-function isEliminated(name) {
-    if (!name || name === '---') return false;
-    const cleanName = name.replace(" (シード)", "");
-    let eliminated = false;
-    Object.keys(matches).forEach(id => {
-        if (id == 15) return; 
-        const m = matches[id];
-        if (m.winner) {
-            const p1Clean = m.p1 ? m.p1.replace(" (シード)", "") : "";
-            const p2Clean = m.p2 ? m.p2.replace(" (シード)", "") : "";
-            const winnerClean = m.winner.replace(" (シード)", "");
-            if ((p1Clean === cleanName || p2Clean === cleanName) && winnerClean !== cleanName) {
-                eliminated = true;
-            }
-        }
-    });
-    return eliminated;
-}
-
 function renderBracket(animatedMatchId = null) {
     const container = document.getElementById('bracket-container'); 
     container.innerHTML = `<svg id="bracket-svg"></svg>`;
     
     Object.keys(startNodes).forEach(sId => {
         const p = startNodes[sId]; const playerName = slotMapping[sId];
-        const isLoser = isEliminated(playerName);
         const div = document.createElement('div');
-        div.className = `player-node ${isLoser ? 'loser' : ''}`;
+        div.className = `player-node`;
         div.id = `node-${sId}`;
         div.style.left = p.isLeft ? `20px` : `1040px`;
         div.style.top = `${p.y - 22}px`; 
@@ -445,32 +454,38 @@ function renderBracket(animatedMatchId = null) {
         container.appendChild(div15);
     }
 
-    setTimeout(() => drawLines(animatedMatchId), 50);
+    container.setAttribute('data-base-height', '600');
+    
+    // 描画がDOMに反映されるのを待ってから確実に線を引く
+    setTimeout(() => { 
+        updateBracketScale(); 
+        drawLines(animatedMatchId); 
+    }, 50);
 }
 
+// 🌟 敗北時のグレーアウトを廃止し、未勝利ルートは全て白線で統一 🌟
 function drawLines(animatedMatchId) {
     const svg = document.getElementById('bracket-svg'); 
     if(!svg) return; svg.innerHTML = '';
     
-    const createPWTLine = (x1, y1, x2, y2, state, isAnimated) => {
+    const createPWTLine = (x1, y1, x2, y2, isWinner, isAnimated) => {
         const d = `M ${x1} ${y1} L ${x2} ${y1} L ${x2} ${y2}`;
         const basePath = document.createElementNS("http://www.w3.org/2000/svg", "path");
         basePath.setAttribute("d", d); basePath.setAttribute("fill", "none"); 
         
-        let strokeColor = "#ffffff";
-        if (state === 'win') strokeColor = "#ff0000";
-        else if (state === 'lose') strokeColor = "#444444";
+        // グレーアウト廃止のため、勝者は赤、それ以外は白
+        let strokeColor = isWinner ? "#ff0000" : "#ffffff";
         
         basePath.setAttribute("stroke", strokeColor); 
         basePath.setAttribute("stroke-width", "6");
         
-        if (isAnimated && state === 'win') {
+        if (isAnimated && isWinner) {
             basePath.style.animation = "fadeIn 1s forwards"; 
             basePath.style.opacity = "0";
         }
         svg.appendChild(basePath);
 
-        if (state === 'win') {
+        if (isWinner) {
             const dotPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
             dotPath.setAttribute("d", d); dotPath.setAttribute("fill", "none"); 
             dotPath.setAttribute("stroke", "#ffff00"); dotPath.setAttribute("stroke-width", "2"); 
@@ -491,48 +506,38 @@ function drawLines(animatedMatchId) {
     }
 
     Object.keys(bracketGraph).forEach(id => {
-        const g = bracketGraph[id]; const m = matches[id];
+        const g = bracketGraph[id]; const m = matches[id] || {};
         const winnerClean = m.winner ? m.winner.replace(" (シード)", "") : null;
         
-        let prevX1, prevY1, state1;
+        let prevX1, prevY1, isWin1 = false;
         if (typeof g.prevP1 === 'string') {
             prevX1 = startNodes[g.prevP1].x; prevY1 = startNodes[g.prevP1].y;
             const p1Name = (slotMapping[g.prevP1] || "").replace(" (シード)", "");
-            if (winnerClean == null) state1 = 'normal';
-            else if (winnerClean === p1Name) state1 = 'win';
-            else state1 = 'lose';
+            if (winnerClean != null && winnerClean === p1Name) isWin1 = true;
         } else {
             prevX1 = bracketGraph[g.prevP1].x; prevY1 = bracketGraph[g.prevP1].y;
-            const prevMatch = matches[g.prevP1];
+            const prevMatch = matches[g.prevP1] || {};
             const prevWinnerClean = prevMatch.winner ? prevMatch.winner.replace(" (シード)", "") : null;
-            if (prevWinnerClean == null) state1 = 'normal';
-            else if (winnerClean == null) state1 = 'win';
-            else if (winnerClean === prevWinnerClean) state1 = 'win';
-            else state1 = 'lose';
+            if (winnerClean != null && winnerClean === prevWinnerClean) isWin1 = true;
         }
-        createPWTLine(prevX1, prevY1, g.x, g.y, state1, (id == animatedMatchId));
+        createPWTLine(prevX1, prevY1, g.x, g.y, isWin1, (id == animatedMatchId));
 
-        let prevX2, prevY2, state2;
+        let prevX2, prevY2, isWin2 = false;
         if (typeof g.prevP2 === 'string') {
             prevX2 = startNodes[g.prevP2].x; prevY2 = startNodes[g.prevP2].y;
             const p2Name = (slotMapping[g.prevP2] || "").replace(" (シード)", "");
-            if (winnerClean == null) state2 = 'normal';
-            else if (winnerClean === p2Name) state2 = 'win';
-            else state2 = 'lose';
+            if (winnerClean != null && winnerClean === p2Name) isWin2 = true;
         } else {
             prevX2 = bracketGraph[g.prevP2].x; prevY2 = bracketGraph[g.prevP2].y;
-            const prevMatch = matches[g.prevP2];
+            const prevMatch = matches[g.prevP2] || {};
             const prevWinnerClean = prevMatch.winner ? prevMatch.winner.replace(" (シード)", "") : null;
-            if (prevWinnerClean == null) state2 = 'normal';
-            else if (winnerClean == null) state2 = 'win';
-            else if (winnerClean === prevWinnerClean) state2 = 'win';
-            else state2 = 'lose';
+            if (winnerClean != null && winnerClean === prevWinnerClean) isWin2 = true;
         }
-        createPWTLine(prevX2, prevY2, g.x, g.y, state2, (id == animatedMatchId));
+        createPWTLine(prevX2, prevY2, g.x, g.y, isWin2, (id == animatedMatchId));
     });
 
     if (matches[14].winner) {
-        createPWTLine(600, 285, 600, 240, 'win', (14 == animatedMatchId));
+        createPWTLine(600, 285, 600, 240, true, (14 == animatedMatchId));
         const crown = document.createElement('div');
         crown.style.position = 'absolute'; crown.style.left = '600px'; crown.style.top = '210px';
         crown.style.transform = 'translate(-50%, -50%)'; crown.style.fontSize = '40px';
@@ -898,8 +903,13 @@ function importFromTxt(input) {
     reader.onload = function(e) { 
         try { 
             const data = JSON.parse(e.target.result); 
-            if(data.matches && data.playerCards) { matches = data.matches; playerCards = data.playerCards; isThirdPlaceEnabled = data.isThirdPlaceEnabled || false; slotMapping = data.slotMapping || {}; } 
-            else { matches = data; playerCards = JSON.parse(JSON.stringify(defaultCards)); }
+            if(data.matches && data.playerCards) { 
+                matches = data.matches; playerCards = data.playerCards; 
+                isThirdPlaceEnabled = data.isThirdPlaceEnabled || false;
+                slotMapping = data.slotMapping || {};
+            } else { 
+                matches = data; playerCards = JSON.parse(JSON.stringify(defaultCards)); 
+            }
 
             if (!matches[15]) {
                 matches[15] = { p1: null, p2: null, winner: null, next: null, slot: null, drawnSongs: null, initialDrawnSongs: null, isSurpriseFlags: null, initialSurpriseFlags: null, redraws: [], details: null, isThirdPlace: true };
@@ -929,9 +939,16 @@ function importFromTxt(input) {
     reader.readAsText(file); input.value = "";
 }
 
+// 📸 トーナメント表の画像ダウンロード処理 (スマホ縮小時も高品質に出力)
 function downloadBracketImage() {
-    const targetElement = document.getElementById('bracket-container');
+    const targetElement = document.getElementById('capture-area');
+    const container = document.getElementById('bracket-container');
     
+    // 画像保存時は強制的に等倍（scale=1）に戻して全体をキャプチャ可能にする
+    container.style.transform = "scale(1)";
+    const baseHeight = container.getAttribute('data-base-height') || 600;
+    targetElement.style.height = `${baseHeight}px`;
+
     html2canvas(targetElement, { 
         backgroundColor: "#161625", 
         scale: 2 
@@ -940,9 +957,13 @@ function downloadBracketImage() {
         link.download = 'DarknessKasaiCup_Bracket.png'; 
         link.href = canvas.toDataURL("image/png"); 
         link.click();
+        
+        // 保存後に元のスマホ表示スケールへ戻す
+        updateBracketScale();
     }).catch(err => { 
         alert("画像の生成に失敗しました。"); 
         console.error(err); 
+        updateBracketScale();
     });
 }
 
