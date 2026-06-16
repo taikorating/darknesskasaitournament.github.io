@@ -4,11 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>第2回Darknessカサイカップ</title>
+    <!-- 紙吹雪ライブラリ -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- 画像化ライブラリ -->
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
     <style>
         :root { 
-            --bg-color: #161625; 
+            --bg-color: #161625; /* PWT風ダークネイビー */
             --panel-bg: #ffffff; 
             --accent: #e73c5a; 
             --text-main: #212529; 
@@ -22,29 +24,30 @@
             color: #fff; 
             font-family: 'Helvetica Neue', Arial, Meiryo, sans-serif; 
             margin: 0; padding: 20px; 
-            overflow-x: hidden; /* スマホでの横揺れ・はみ出しを完全防止 */
         }
         h1 { text-align: center; color: #ffd700; font-size: 2.2em; margin-bottom: 20px; text-shadow: 2px 2px 0px #000, 0 0 10px #ff9800; }
         .controls { text-align: center; margin-bottom: 20px; background: rgba(0,0,0,0.5); padding: 15px; border-radius: 8px; border: 2px solid #555; display: flex; justify-content: center; align-items: center; gap: 15px; flex-wrap: wrap; }
         button { background-color: #ffffff; color: var(--accent); border: 2px solid var(--accent); padding: 8px 16px; font-size: 14px; cursor: pointer; border-radius: 5px; font-weight: bold; transition: 0.2s; }
         button:hover { background-color: var(--accent); color: #fff; }
 
-        /* PWT風トーナメント表エリア（スマホ常時フィット対応） */
-        #capture-area { 
+        /* PWT風トーナメント表エリア（スマホは横スクロールで快適に） */
+        .bracket-wrapper { 
             width: 100%; 
-            overflow: hidden;
-            background-color: var(--bg-color); 
-            background-image: linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
-            background-size: 30px 30px;
-            margin: 0 auto;
-            padding: 20px 0;
-            box-sizing: content-box;
+            overflow-x: auto; 
+            -webkit-overflow-scrolling: touch; 
+            padding: 20px 0; 
         }
         .bracket-container { 
             position: relative; 
+            margin: 0 auto; 
             width: 1200px; 
-            background: transparent; 
-            margin: 0 auto;
+            height: 600px; 
+            /* 画像出力用に背景を設定 */
+            background-color: var(--bg-color); 
+            background-image: 
+                linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
+            background-size: 30px 30px;
         }
         #bracket-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
         
@@ -57,7 +60,7 @@
         }
         .player-node .color-bar { width: 12px; height: 100%; border-right: 2px solid #333; }
         .player-node .name { padding-left: 8px; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 115px; }
-        .player-node.loser { filter: brightness(0.4) grayscale(1); }
+        .player-node.loser { filter: brightness(0.4) grayscale(1); } /* 敗退者は暗くなる */
 
         /* VS結節点（対戦ボタン） */
         .vs-btn {
@@ -154,7 +157,7 @@
         .results-table th { background-color: #f1f3f5; }
         .table-winner { color: var(--accent); font-weight: bold; }
 
-        /* 📱 スマホ対応 (レスポンシブ設計) 📱 */
+        /* 📱 スマホ対応レイアウト 📱 */
         @media (max-width: 768px) {
             body { padding: 10px; }
             h1 { font-size: 1.6em; margin-bottom: 15px; }
@@ -162,7 +165,6 @@
             .controls span { display: none; }
             .controls button, .controls div { width: 100%; box-sizing: border-box; }
             
-            /* モーダル内のスマホ最適化 */
             .modal-content { padding: 15px; width: 95%; }
             .vs-screen { font-size: 14px; }
             .player-box { padding: 8px; }
@@ -172,7 +174,6 @@
             .draw-btn-huge { font-size: 18px; padding: 15px; }
             .reel { font-size: 14px; padding: 10px; margin: 5px 0; }
             
-            /* 演出文字のサイズ調整 */
             .cutin-text { font-size: 24px; letter-spacing: 2px; }
             #redraw-target { font-size: 20px; }
             #redraw-arrow { font-size: 30px; }
@@ -202,7 +203,8 @@
         <button onclick="downloadBracketImage()" style="background-color: #2196F3; color: white; border-color: #2196F3;">📸 トーナメント表を画像保存</button>
     </div>
 
-    <div class="bracket-wrapper" id="capture-area">
+    <!-- PWT風 対戦ツリーエリア（横スクロール対応） -->
+    <div class="bracket-wrapper">
         <div class="bracket-container" id="bracket-container">
             <svg id="bracket-svg"></svg>
         </div>
@@ -216,6 +218,7 @@
         </table>
     </div>
 
+    <!-- 対戦・スコア入力モーダル -->
     <div class="modal-overlay" id="match-modal">
         <div class="modal-content" id="modal-content-box">
             <span style="position: absolute; top:10px; right:15px; font-size:24px; cursor:pointer; z-index:999; color:#888;" onclick="closeModal()">&times;</span>
@@ -254,6 +257,7 @@
         </div>
     </div>
 
+    <!-- ⚔️ 再抽選アニメーション用オーバーレイ ⚔️ -->
     <div id="redraw-overlay">
         <div id="cutin-bar" class="cutin-bar">
             <span id="cutin-text" class="cutin-text">をわん選手 カード発動!!</span>
@@ -264,6 +268,7 @@
         <div id="redraw-gekiatsu" class="gekiatsu" style="display:none;"></div>
     </div>
 
+    <!-- 🏆 勝者発表オーバーレイ 🏆 -->
     <div id="winner-overlay" onclick="closeWinnerAnimation()">
         <div id="winner-name-text" class="winner-announce-text">勝者<br><span>〇〇選手</span> ！！</div>
         <div class="click-to-close">画面をクリックして次へ進む</div>
@@ -288,38 +293,8 @@ let isSurpriseFlags = [false, false, false];
 let spinInterval = null;
 let isThirdPlaceEnabled = false; 
 
-// 📱 スマホ対応: 画面幅に合わせてトーナメント表を完全フィットさせる処理 📱
-function updateBracketScale() {
-    const wrapper = document.getElementById('capture-area');
-    const container = document.getElementById('bracket-container');
-    if (!wrapper || !container) return;
-
-    const baseWidth = 1200;
-    const baseHeight = parseFloat(container.getAttribute('data-base-height')) || 600;
-    
-    const screenWidth = window.innerWidth;
-    const padding = screenWidth <= 768 ? 20 : 40; 
-    const availableWidth = screenWidth - padding;
-
-    if (availableWidth < baseWidth) {
-        const scale = availableWidth / baseWidth;
-        container.style.transform = `scale(${scale})`;
-        container.style.transformOrigin = "top left";
-        container.style.margin = "0"; 
-        
-        wrapper.style.width = `${baseWidth * scale}px`;
-        wrapper.style.height = `${baseHeight * scale}px`;
-    } else {
-        container.style.transform = "scale(1)";
-        container.style.transformOrigin = "top center";
-        container.style.margin = "0 auto";
-        
-        wrapper.style.width = `100%`;
-        wrapper.style.height = `${baseHeight}px`;
-    }
-}
-window.addEventListener('resize', () => { drawLines(); updateBracketScale(); });
-
+// スケール処理は廃止し、リサイズ時は線の再描画のみ行う
+window.addEventListener('resize', () => { drawLines(); });
 
 let tempScores = {};
 function saveTempScores() {
@@ -470,12 +445,7 @@ function renderBracket(animatedMatchId = null) {
         container.appendChild(div15);
     }
 
-    container.setAttribute('data-base-height', '600');
-    
-    setTimeout(() => { 
-        drawLines(animatedMatchId); 
-        updateBracketScale(); 
-    }, 50);
+    setTimeout(() => drawLines(animatedMatchId), 50);
 }
 
 function drawLines(animatedMatchId) {
@@ -527,7 +497,7 @@ function drawLines(animatedMatchId) {
         let prevX1, prevY1, state1;
         if (typeof g.prevP1 === 'string') {
             prevX1 = startNodes[g.prevP1].x; prevY1 = startNodes[g.prevP1].y;
-            const p1Name = slotMapping[g.prevP1].replace(" (シード)", "");
+            const p1Name = (slotMapping[g.prevP1] || "").replace(" (シード)", "");
             if (winnerClean == null) state1 = 'normal';
             else if (winnerClean === p1Name) state1 = 'win';
             else state1 = 'lose';
@@ -545,7 +515,7 @@ function drawLines(animatedMatchId) {
         let prevX2, prevY2, state2;
         if (typeof g.prevP2 === 'string') {
             prevX2 = startNodes[g.prevP2].x; prevY2 = startNodes[g.prevP2].y;
-            const p2Name = slotMapping[g.prevP2].replace(" (シード)", "");
+            const p2Name = (slotMapping[g.prevP2] || "").replace(" (シード)", "");
             if (winnerClean == null) state2 = 'normal';
             else if (winnerClean === p2Name) state2 = 'win';
             else state2 = 'lose';
@@ -959,27 +929,20 @@ function importFromTxt(input) {
     reader.readAsText(file); input.value = "";
 }
 
-// 🌟 スマホ用: 画像出力時は一時的にスケールを解除して高品質キャプチャする 🌟
 function downloadBracketImage() {
-    const targetElement = document.getElementById('capture-area');
-    const container = document.getElementById('bracket-container');
+    const targetElement = document.getElementById('bracket-container');
     
-    const originalTransform = container.style.transform;
-    const originalWrapperHeight = targetElement.style.height;
-    const baseHeight = container.getAttribute('data-base-height') || 600;
-    
-    container.style.transform = "scale(1)";
-    targetElement.style.height = `${baseHeight}px`;
-    targetElement.style.width = "1200px";
-
-    html2canvas(targetElement, { backgroundColor: "#161625", scale: 2 }).then(canvas => {
-        const link = document.createElement('a'); link.download = 'DarknessKasaiCup_Bracket.png'; link.href = canvas.toDataURL("image/png"); link.click();
-        targetElement.style.width = "100%";
-        updateBracketScale();
+    html2canvas(targetElement, { 
+        backgroundColor: "#161625", 
+        scale: 2 
+    }).then(canvas => {
+        const link = document.createElement('a'); 
+        link.download = 'DarknessKasaiCup_Bracket.png'; 
+        link.href = canvas.toDataURL("image/png"); 
+        link.click();
     }).catch(err => { 
-        alert("画像の生成に失敗しました。"); console.error(err); 
-        targetElement.style.width = "100%";
-        updateBracketScale();
+        alert("画像の生成に失敗しました。"); 
+        console.error(err); 
     });
 }
 
