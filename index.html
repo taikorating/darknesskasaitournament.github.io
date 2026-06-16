@@ -10,14 +10,13 @@
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
     <style>
         :root { 
-            --bg-color: #161625; /* PWT風ダークネイビー */
+            --bg-color: #161625; 
             --panel-bg: #ffffff; 
             --accent: #e73c5a; 
             --text-main: #212529; 
         }
         body { 
             background-color: var(--bg-color); 
-            /* レトロな格子状背景 */
             background-image: 
                 linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
                 linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
@@ -32,11 +31,17 @@
         button:hover { background-color: var(--accent); color: #fff; }
 
         /* PWT風トーナメント表エリア */
-        .bracket-wrapper { width: 100%; overflow-x: auto; padding: 20px 0; }
-        .bracket-container { position: relative; margin: 0 auto; width: 1200px; height: 600px; background: transparent; }
+        #capture-area { 
+            width: 100%; padding: 20px 0; overflow: hidden;
+            /* 画像出力時に背景模様も映すため、エリア自体に背景を設定 */
+            background-color: var(--bg-color); 
+            background-image: linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
+            background-size: 30px 30px;
+            display: flex; justify-content: center;
+        }
+        .bracket-container { position: relative; width: 1200px; height: 600px; background: transparent; transform-origin: top center; }
         #bracket-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
         
-        /* 選手枠（Player Box） */
         .player-node {
             position: absolute; width: 140px; height: 44px; background: #e0e0e0;
             border: 3px solid #333; border-radius: 4px; display: flex; align-items: center;
@@ -45,9 +50,8 @@
         }
         .player-node .color-bar { width: 12px; height: 100%; border-right: 2px solid #333; }
         .player-node .name { padding-left: 8px; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 115px; }
-        .player-node.loser { filter: brightness(0.4) grayscale(1); } /* 敗退者は暗くなる */
+        .player-node.loser { filter: brightness(0.4) grayscale(1); }
 
-        /* VS結節点（対戦ボタン） */
         .vs-btn {
             position: absolute; width: 36px; height: 36px; background: #fff; color: #000;
             border: 3px solid #333; border-radius: 50%; font-weight: 900; font-size: 13px;
@@ -59,7 +63,6 @@
         .vs-btn.completed { background: #555; color: #aaa; border-color: #222; box-shadow: none; }
         .vs-btn.completed:hover { background: #777; }
 
-        /* 三位決定戦ボックス */
         .third-place-box {
             position: absolute; left: 600px; top: 520px; transform: translateX(-50%); width: 260px;
             background: rgba(0,0,0,0.8); border: 2px solid #ff9800; border-radius: 6px; padding: 10px;
@@ -82,7 +85,8 @@
         
         /* 🎰 パチンコ・激アツ演出CSS 🎰 */
         #pachinko-area { display: none; margin-top: 15px; }
-        .flash-text { color: red; font-size: 28px; font-weight: 900; text-shadow: 0 0 10px yellow, 2px 2px 0 #000; margin-bottom: 10px; }
+        .flash-text { color: red; font-size: 28px; font-weight: 900; text-shadow: 0 0 10px yellow, 2px 2px 0 #000; animation: flashAnim 0.1s infinite alternate; margin-bottom: 10px; }
+        @keyframes flashAnim { from { opacity: 1; transform: scale(1); color: red; } to { opacity: 0.8; transform: scale(1.1); color: yellow; } }
         .pachinko-wrapper { background: linear-gradient(135deg, #111, #444, #111); border: 6px solid gold; border-radius: 10px; padding: 20px; box-shadow: 0 0 30px rgba(255, 215, 0, 0.6), inset 0 0 20px #000; }
         .reel { background: #fff; color: #000; font-size: 18px; font-weight: 900; margin: 10px 0; padding: 15px; border: 4px solid silver; border-radius: 5px; box-shadow: inset 0 0 15px rgba(0,0,0,0.8); position: relative; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .reel.stopped { background: linear-gradient(90deg, #ffea00, #ff5e00, #ffea00); background-size: 200% 200%; animation: goldShine 0.5s infinite linear; border-color: red; color: #fff; text-shadow: 2px 2px 0 #ff0000, -2px -2px 0 #ff0000; transform: scale(1.05); transition: 0.2s; }
@@ -96,6 +100,7 @@
         @keyframes modalShake { 0%, 100% { transform: translate(0, 0); } 20% { transform: translate(5px, 5px); } 40% { transform: translate(-5px, -5px); } 60% { transform: translate(5px, -5px); } 80% { transform: translate(-5px, 5px); } }
 
         .gekiatsu { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0); font-size: 100px; color: transparent; background: linear-gradient(to bottom, #fff 0%, #ffea00 40%, #ff0000 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-stroke: 3px #fff; text-shadow: 0 0 30px #ff0000; font-weight: 900; z-index: 9999; pointer-events: none; opacity: 0; white-space: nowrap; }
+        .kourin { background: linear-gradient(to bottom, #fff 0%, #ff00ff 40%, #000 100%); text-shadow: 0 0 50px #ff00ff, 0 0 20px #00ffff; -webkit-text-stroke: 2px #fff; }
         @keyframes gekiatsuAnim { 0% { opacity: 0; transform: translate(-50%, -50%) scale(0) rotate(-15deg); } 20% { opacity: 1; transform: translate(-50%, -50%) scale(1.2) rotate(5deg); } 30% { transform: translate(-50%, -50%) scale(0.9) rotate(0deg); } 80% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); } 100% { opacity: 0; transform: translate(-50%, -50%) scale(2); } }
 
         .draw-btn-huge { width: 100%; padding: 25px; font-size: 24px; font-weight: 900; background: linear-gradient(to bottom, #ff0000, #990000); color: yellow; border: 4px solid gold; border-radius: 10px; box-shadow: 0 10px 0 #550000, 0 15px 20px rgba(0,0,0,0.5); text-shadow: 2px 2px 0 #000; cursor: pointer; transition: 0.1s; }
@@ -109,12 +114,14 @@
         .card-btn { background: #fff; border: 1px solid var(--accent); color: var(--accent); font-size: 11px; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-weight: bold; transition: 0.2s; }
         .card-btn:hover { background: var(--accent); color: #fff; }
         .no-card { font-size: 11px; color: #aaa; border: 1px dashed #ccc; padding: 4px 8px; border-radius: 4px; background: #f8f9fa; }
+        
+        /* スコア入力列 */
         .score-row { display: flex; justify-content: space-around; }
         .score-col { text-align: center; width: 45%; background: #fff; padding: 10px; border-radius: 6px; border: 1px solid #ffe066; }
         .score-col span { font-size: 14px; font-weight: bold; display: block; margin-bottom: 8px; color: #333; border-bottom: 1px dashed #ccc; padding-bottom: 5px; }
         .score-col input { width: 50px; padding: 6px; font-size: 16px; text-align: center; border: 2px solid #ccc; border-radius: 4px; margin: 0 2px; color: #000;}
 
-        /* ⚔️ 再抽選（カットイン）アニメーション専用CSS ⚔️ */
+        /* ⚔️ 再抽選アニメーション専用CSS ⚔️ */
         #redraw-overlay { display: none; flex-direction: column; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 2000; justify-content: center; align-items: center; }
         .cutin-bar { width: 100%; background: linear-gradient(90deg, transparent, #ff0000, #990000, #ff0000, transparent); padding: 30px 0; text-align: center; transform: skewY(-5deg) scaleX(0); opacity: 0; box-shadow: 0 0 50px red, inset 0 0 20px #000; }
         .cutin-text { font-size: 50px; font-weight: 900; font-style: italic; color: #fff; text-shadow: 4px 4px 0px #000, 0 0 20px yellow; letter-spacing: 5px; white-space: nowrap; }
@@ -126,7 +133,7 @@
         .winner-announce-text { font-size: 50px; font-weight: 900; color: #fff; text-shadow: 0 0 30px #ffea00, 5px 5px 0px #ff0000; transform: scale(0); text-align: center; line-height: 1.2; }
         .winner-announce-text span { font-size: 80px; color: #ffd700; display: inline-block; padding: 10px; }
         @keyframes winnerZoom { 0% { transform: scale(0) rotate(-10deg); opacity: 0; } 100% { transform: scale(1) rotate(0deg); opacity: 1; } }
-        .click-to-close { color: #aaa; margin-top: 30px; font-size: 16px; }
+        .click-to-close { color: #aaa; margin-top: 30px; font-size: 16px; animation: flashAnim 1s infinite; }
         
         .replay-btn-group { display: flex; gap: 10px; justify-content: center; margin-bottom: 20px; flex-wrap: wrap; }
         .btn-replay { background: #222; color: #fff; border: 2px solid #555; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px; transition: 0.2s; }
@@ -139,6 +146,40 @@
         .results-table th, .results-table td { border: 1px solid var(--border-color); padding: 8px; text-align: center; }
         .results-table th { background-color: #f1f3f5; }
         .table-winner { color: var(--accent); font-weight: bold; }
+
+        /* 📱 スマホ完全対応 (レスポンシブ設計) 📱 */
+        @media (max-width: 768px) {
+            body { padding: 10px; }
+            h1 { font-size: 1.6em; }
+            .controls { flex-direction: column; gap: 10px; padding: 10px; }
+            .controls span { display: none; }
+            .controls button, .controls div { width: 100%; box-sizing: border-box; }
+            #capture-area { padding: 10px 0; }
+            
+            /* モーダル内のスマホ最適化 */
+            .modal-content { padding: 15px; width: 95%; }
+            .vs-screen { font-size: 14px; }
+            .player-box { padding: 8px; }
+            
+            /* スコア入力列を縦並びに */
+            .score-row { flex-direction: column; gap: 10px; }
+            .score-col { width: 100%; box-sizing: border-box; }
+            
+            .draw-btn-huge { font-size: 18px; padding: 15px; }
+            .reel { font-size: 14px; padding: 10px; margin: 5px 0; }
+            
+            /* 演出文字のサイズ調整 */
+            .cutin-text { font-size: 24px; letter-spacing: 2px; }
+            #redraw-target { font-size: 20px; }
+            #redraw-arrow { font-size: 30px; }
+            #redraw-reel { font-size: 20px; padding: 15px; }
+            
+            .winner-announce-text { font-size: 30px; }
+            .winner-announce-text span { font-size: 40px; }
+            
+            .song-title { flex-direction: column; align-items: flex-start; }
+            .card-actions { width: 100%; justify-content: flex-end; margin-top: 5px; }
+        }
     </style>
 </head>
 <body>
@@ -151,12 +192,11 @@
         <button id="third-place-toggle-btn" onclick="toggleThirdPlace()" style="border-color: #ff9800; color: #ff9800; background: #111;">三位決定戦: OFF</button>
         <span style="color: #aaa;">|</span>
         <button onclick="exportToTxt()">状況をtxt保存</button>
-        <div style="color: #fff;">
-            <label for="import-file" style="font-size:13px; font-weight:bold;">txtから復元:</label>
-            <input type="file" id="import-file" accept=".txt" onchange="importFromTxt(this)" style="color:#fff;">
+        <div style="color: #fff; text-align: left;">
+            <label for="import-file" style="font-size:13px; font-weight:bold;">txtから復元:</label><br>
+            <input type="file" id="import-file" accept=".txt" onchange="importFromTxt(this)" style="color:#fff; margin-top:5px; width: 100%;">
         </div>
         <span style="color: #aaa;">|</span>
-        <!-- 画像保存ボタン -->
         <button onclick="downloadBracketImage()" style="background-color: #2196F3; color: white; border-color: #2196F3;">📸 トーナメント表を画像保存</button>
     </div>
 
@@ -250,6 +290,33 @@ let currentDrawnSongs = [];
 let isSurpriseFlags = [false, false, false];
 let spinInterval = null;
 let isThirdPlaceEnabled = false; 
+
+// 📱 スマホ対応: 画面幅に合わせてトーナメント表を縮小フィットさせる処理 📱
+function updateBracketScale() {
+    const wrapper = document.getElementById('capture-area');
+    const container = document.getElementById('bracket-container');
+    if (!wrapper || !container) return;
+
+    const baseWidth = 1200;
+    const baseHeight = parseFloat(container.getAttribute('data-base-height')) || 600;
+    const wrapperWidth = wrapper.clientWidth;
+
+    if (wrapperWidth < baseWidth) {
+        const scale = wrapperWidth / baseWidth;
+        container.style.transform = `scale(${scale})`;
+        container.style.transformOrigin = "top left";
+        wrapper.style.height = `${baseHeight * scale}px`;
+        wrapper.style.display = "block";
+    } else {
+        container.style.transform = "scale(1)";
+        container.style.transformOrigin = "top center";
+        wrapper.style.height = `${baseHeight}px`;
+        wrapper.style.display = "flex";
+        wrapper.style.justifyContent = "center";
+    }
+}
+window.addEventListener('resize', () => { drawLines(); updateBracketScale(); });
+
 
 let tempScores = {};
 function saveTempScores() {
@@ -400,7 +467,13 @@ function renderBracket(animatedMatchId = null) {
         container.appendChild(div15);
     }
 
-    setTimeout(() => drawLines(animatedMatchId), 50);
+    // 🌟 高さを計算してセット（スマホフィット用）
+    container.setAttribute('data-base-height', '600');
+    
+    setTimeout(() => { 
+        drawLines(animatedMatchId); 
+        updateBracketScale(); // 🌟スマホフィット処理呼び出し
+    }, 50);
 }
 
 function drawLines(animatedMatchId) {
@@ -496,6 +569,7 @@ function drawLines(animatedMatchId) {
         document.getElementById('bracket-container').appendChild(crown);
     }
 }
+
 
 function openMatch(id) {
     const m = matches[id];
@@ -884,11 +958,31 @@ function importFromTxt(input) {
     reader.readAsText(file); input.value = "";
 }
 
+// 🌟 スマホ用: 画像出力時は一時的にスケールを解除して高品質キャプチャする 🌟
 function downloadBracketImage() {
     const targetElement = document.getElementById('capture-area');
+    const container = document.getElementById('bracket-container');
+    
+    // 一時的に元のサイズに戻す
+    const originalTransform = container.style.transform;
+    const originalWrapperHeight = targetElement.style.height;
+    const baseHeight = container.getAttribute('data-base-height') || 600;
+    
+    container.style.transform = "scale(1)";
+    targetElement.style.height = `${baseHeight}px`;
+    targetElement.style.width = "1200px";
+
     html2canvas(targetElement, { backgroundColor: "#161625", scale: 2 }).then(canvas => {
         const link = document.createElement('a'); link.download = 'DarknessKasaiCup_Bracket.png'; link.href = canvas.toDataURL("image/png"); link.click();
-    }).catch(err => { alert("画像の生成に失敗しました。"); console.error(err); });
+        
+        // スマホ画面用にスケールを戻す
+        targetElement.style.width = "100%";
+        updateBracketScale();
+    }).catch(err => { 
+        alert("画像の生成に失敗しました。"); console.error(err); 
+        targetElement.style.width = "100%";
+        updateBracketScale();
+    });
 }
 
 initMatches(); renderBracket(); renderResultsTable();
